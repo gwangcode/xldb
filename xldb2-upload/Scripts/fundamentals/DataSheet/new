@@ -1,0 +1,99 @@
+import stdwb as wb, files
+
+# Help information
+HelpInfo=''' 
+Create workbook or sheet 
+new WorkbookTag or /WorkbookTag .file file path -> creates new workbook that does not exist
+new WorkbookTag or /WorkbookTag .template template path .file file path -> creates new workbook that does not exist with the template xlsx file
+new SheetName or /Workook/SheetName .pos [Position]-> creates new sheet in open workbook
+new -> show help information
+'''
+# Variables
+#la=len(args)
+Pos=None
+FilePath=None
+List=[]
+Template=''
+ReadOnly=False
+DataOnly=True
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, pkey=['file', 'pos', 'template'], nkey=['help', 'readonly', 'formula'])
+
+if opts:
+  for i in opts:
+    if i[0]=='file': 
+      if i[1]: FilePath=i[1] # File path
+      else: FilePath=_RTN
+    elif i[0]=='pos': # Sheet position
+      if i[1]: Pos=i[1]
+      else: Pos=_RTN
+    elif i[0]=='template': Template=i[1]
+    elif i[0]=='readonly': ReadOnly=True
+    elif i[0]=='formula': DataOnly=False
+    elif i[0]=='help': err(HelpInfo)
+
+lf=len(free)
+if lf==1: List=_RTN
+elif lf==2: 
+  if type(free[1]) in (list, tuple): List=free[1] 
+  else: List=[free[1]]
+
+elif lf>2: List=free[1:]
+else: 
+  cprint(HelpInfo)
+  return
+
+# Main code
+if List:
+  r=[]
+  for i in List:
+    w, s, c=wb.split_wbname(i)
+    if s:
+      if wb.legal_name(s):
+        if w in wb.wblist():
+          if s in wb.shlist(w): cprint('Sheet '+s+' already exists')
+          else:
+            if Pos:
+              try: Pos=int(Pos)
+              except: err('Position should be an integer')
+              if Pos<0: err('Position should be positive')
+            wb.new_sheet('/'+w+'/'+s, Pos)
+            if Pos is not None: Pos+=1
+            r.append(s)
+            cprint('Created sheet '+s)
+        else: cprint('Workbook '+w+' not exists')
+          
+      else: cprint('Illegal sheet name: '+s)
+
+    elif w:
+      if wb.legal_name(w):
+        if w in wb.wblist(): cprint('Workbook '+w+' already exists')
+        else:
+          if FilePath:
+            if wb.File_Path_Parser(FilePath).exists(False): 
+              if Template:
+                if files.exists(Template): 
+                  wkbko=xl.load_workbook(Template, data_only=DataOnly, read_only=ReadOnly) # Template exists
+                  wb.wbset[w]=wb.wb(wkbko, FilePath)
+                else: err('Template does not exist')
+              else: 
+                wb.wbset[w]=wb.wb(xl.Workbook())
+              wb.wbcls(w).p=FilePath
+            else: cprint('Directory '+FilePath+' not exists')
+          else: 
+            if Template:
+              if files.exists(Template): # Template exists
+                wkbko=xl.load_workbook(Template)
+                wb.wbset[w]=wb.wb(wkbko)
+              else: err('Template does not exist')
+            else: wb.wbset[w]=wb.wb(xl.Workbook())
+          if ReadOnly: wb.wbset[w].d=xl.Workbook(write_only=True)
+          cprint('Created workbook '+w)
+          r.append(w)
+
+      else: cprint('Illegal workbook tag '+w)
+    else: cprint('No workbook or sheet designated')
+  return r
+else: cprint(HelpInfo) 
+    

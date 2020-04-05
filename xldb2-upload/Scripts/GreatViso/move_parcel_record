@@ -1,0 +1,138 @@
+import stdwb as wb, files, os
+
+# Help information
+HelpInfo='''
+
+move_parcel_record 3023558 30235589 ... .from w1 .to w2 -> move records by tracking #'s
+move_parcel_record .name .from w1 .to w2 -> move records by tracking #'s .previous ~/Dropbox/Haitao/03-20-20[!D] -> move by duplicate names, if previous, remove duplicate names apprearing in previous files
+move_parcel_record .mark .from w1 .to w2 -> move records by mark 'r' on Sheet1/P or Sheet/L
+move_parcel_record .phone .from w1/s1 .to w2/s2 -> move records by tracking .previous ~/Dropbox/Haitao/03-20-20[!D] #'s -> move by duplicate phone #'s,if previous, remove duplicate phones apprearing in previous files
+move_parcel_record .id .from w1/s1 .to w2/s2 -> move records by tracking #'s -> move by duplicate id's
+               
+w1 & w2 are xlsx files
+'''
+# Variables & Functions
+la=len(args)
+FromWb=''
+ToWb=''
+FromFile=''
+ToFile=''
+ByName=False
+ByMark=False
+TrackingList=None
+ByPhone=False
+ById=False
+PrevFile=[]
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help', 'name', 'mark', 'id', 'phone'], pkey=['from', 'to', 'previous'])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    elif i[0]=='from': FromFile=i[1]
+    elif i[0]=='to': ToFile=i[1]
+    elif i[0]=='name': ByName=True
+    elif i[0]=='mark': ByMark=True
+    elif i[0]=='id': ById=True
+    elif i[0]=='phone': ByPhone=True
+    elif i[0]=='previous': PrevFile=files.walk(i[1])
+    
+
+if free: 
+  lf=len(free)
+  if lf>=2: TrackingList=free[1:] 
+else: err('Illegal parameters')
+
+# Main code
+$. close w1 w2;
+
+if FromFile:
+  if os.path.isfile(files.fpath(FromFile)):
+    $. open =FromFile .as w1;
+    if 'w1' in `.lw;`: FromWb='w1'
+    else: err('Unable to open '+FromFile)
+  else: err(FromFile+' does not exist')
+
+else: err('No file designated')
+
+if ToFile:
+  if os.path.isfile(files.fpath(ToFile)):
+    $. open =ToFile .as w2;
+    if 'w2' in `.lw;`: ToWb='w2'
+    else: err('Unable to open '+ToFile)
+  else:
+    Template='/'.join(scriptdir().split('/')[:-1])+'/templates/xlsx_sheet1_sheet2.xlsx'
+    $. new w2 .template =Template .file =ToFile
+    if 'w2' in `.lw`: ToWb='w2'
+    else: err('Unable to create '+ToFile)
+
+  $. fetch .from w1/Sheet1/1: .to w2/Sheet1/1:;
+  $. fetch .from w1/Sheet2/1: .to w2/Sheet2/1:;
+_GLB['TrackingList']=[]
+
+PrevList=[]
+s=lambda x: str(x).strip()
+if PrevFile:
+  for f in PrevFile:
+    if os.path.isfile(f):
+      $. close wp;
+      $. open =f .as wp;
+      if ByName: L=$. fetch .from wp/Sheet1/F2:F .bycol
+      elif ByPhone: L=$. fetch .from wp/Sheet1/G2:G .bycol
+      PrevList+=list(map(s, L[0]))
+      $.close wp;
+
+if ByName or ById or ByPhone: 
+  if ByName: 
+    idx=$. idup =FromWb+'/Sheet1/F';
+    Cond='{F} in '+str(PrevList)
+    idx2=$. fetch .index .from =FromWb+'/Sheet1' .where =Cond .bycol
+    if idx2:
+      idx2=idx2[0]
+      idx+=idx2
+  elif ById: idx=$. idup =FromWb+'/Sheet1/K' .full;
+  elif ByPhone: 
+    idx=$. idup =FromWb+'/Sheet1/G';
+    Cond='str({G}).strip() in '+str(PrevList)
+    idx2=$. fetch .index .from =FromWb+'/Sheet1' .where =Cond .bycol
+    if idx2:
+      idx2=idx2[0]
+      idx+=idx2
+  idx=list(set(idx))
+  
+  if idx:
+    idx=list(map(str, idx))
+    _GLB['idx']=idx
+    TrackingList=$. fetch B .from =FromWb+'/Sheet1' .where "str({.idx.}).strip() in _GLB['idx']" .bycol; # get tracking by index
+    
+    TrackingList=list(map(str, TrackingList[0]))
+    _GLB['TrackingList']=TrackingList
+    if ToWb: $. move .from =FromWb+'/Sheet1' .to =ToWb+'/Sheet1' .where "str({.idx.}).strip() in _GLB['idx']" # move Sheet1 by name
+    else: $. move .from =FromWb+'/Sheet1' .where "str({.idx.}).strip() in _GLB['idx']" # move Sheet1 by name
+  else: err('No duplicate names')
+
+elif ByMark: 
+  
+  Tracking=$. fetch B .from =FromWb+'/Sheet1' .where "str({P}).strip()=='r'" .bycol; # get tracking # by Sheet1/P is 'r'
+  if Tracking: _GLB['TrackingList']=list(map(str, Tracking[0]))
+  
+  Tracking=$. fetch B .from =FromWb+'/Sheet2' .where "str({L}).strip()=='r'" .bycol; # get tracking # by Sheet1/P is 'r'
+  
+  if Tracking: _GLB['TrackingList']+=list(map(str, Tracking[0]))
+  
+  if ToWb: $. move .from =FromWb+'/Sheet1' .to =ToWb+'/Sheet1' .where "str({B}).strip() in _GLB['TrackingList']" # move Sheet1 by tracking
+  else: $. move .from =FromWb+'/Sheet1' .where "str({B}).strip() in _GLB['TrackingList']" # move Sheet1 by tracking
+
+else: 
+  _GLB['TrackingList']=TrackingList
+  if ToWb: $. move .from =FromWb+'/Sheet1' .to =ToWb+'/Sheet1' .where "str({B}).strip() in _GLB['TrackingList']" # move Sheet1 by tracking
+  else: $. move .from =FromWb+'/Sheet1' .where "str({B}).strip() in _GLB['TrackingList']" # move Sheet1 by tracking
+
+if ToWb: $. move .from =FromWb+'/Sheet2' .to =ToWb+'/Sheet2' .where "str({B}).strip() in _GLB['TrackingList']" # move Sheet2
+else: $. move .from =FromWb+'/Sheet2' .where "str({B}).strip() in _GLB['TrackingList']" # move Sheet2
+
+$. save w1; && close w1;
+if ToWb: $. save w2; && close w2;
+  
+    

@@ -1,0 +1,65 @@
+import stdwb as wb, termcolor
+
+# Help information
+HelpInfo='''
+move satisfyed rows/cols from one sheet to another 
+move .from FromSheet .to ToSheet .where [Condition] -> move rows, if no Condition, move the entire sheet
+#move .from w/s/1:3 or w/s/1 .to w/s/1 ... -> move rows
+#move .from w/s/A:C or w/s/A .to w/s/ or w/s/A2 ... -> move cols
+     .header -> print with header
+     .index -> return with index
+     .refresh -> refresh the to-sheet, if the to-sheet has data, clear it otherwise, append to the to-sheet
+if no .to, just remove the selected cols/rows
+
+'''
+# Variables & Functions
+la=len(args)
+FromSheet=''
+ToSheet=''
+Condition='True'
+Header=False
+Index=False
+Refresh=False
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help', 'header', 'index', 'refresh'], pkey=['from', 'to', 'where'])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    elif i[0]=='from': FromSheet=i[1]
+    elif i[0]=='to': ToSheet=i[1]
+    elif i[0]=='where': Condition=i[1]
+    elif i[0]=='header': Header=True
+    elif i[0]=='index': Index=True
+    elif i[0]=='refresh': Refresh=True
+    
+# Main code
+if FromSheet:
+  FromSheet=str(FromSheet)
+  if FromSheet not in `.lw */*;`: err(FromSheet+' not exists')
+  if Header: Data=$. fetch .header .index * .from =FromSheet .where =Condition; # where
+  else: Data=$. fetch .index * .from =FromSheet .where =Condition; # where
+  # print out moved data
+  
+  for i in Data:
+    if type(i) in (tuple, list): cprint(termcolor.colored('|', 'blue').join([str(j) for j in i]))
+    else: cprint(i)
+  ######################
+  if Data:
+    Indices=[i[0] for i in Data]
+    if Header: Indices=Indices[1:]
+    if not Index: Data=[i[1:] for i in Data]
+
+    if ToSheet: # .to
+      ToSheet=str(ToSheet)
+      if ToSheet not in `.lw */*;`: err(ToSheet+' not exists')
+      if Refresh: $. fetch =Data .to =ToSheet; # where
+      else: 
+        for i in Data: $. append .row =i .at =ToSheet;
+    
+    $. remove =Indices .from =FromSheet; # remove from source sheet
+    
+    return Data 
+  
+else: err('No designation of source sheet')

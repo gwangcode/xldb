@@ -1,0 +1,70 @@
+import stdwb as wb, datatype, files
+
+# Help information
+HelpInfo='''
+contatenate xlsx records vertically or horizontally
+It only contatenates the first sheet of each workbook
+catxl [xlsx files] .to to-xlsx file -> contatenate xlsx files to xlsx file vertically, in which to-xlsx should exist
+      .horizontal -> contatenate xlsx files horizontally
+      .header n -> ignore n rows of headers from the 2nd file
+      .template Template file -> create new workbook by template file
+'''
+# Variables & Functions
+la=len(args)
+HeaderRows=1
+Horizontal=False
+ToFile=''
+Template=''
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help', 'horizontal'], pkey=['header', 'to', 'template'])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    elif i[0]=='horizontal': Horizontal=True
+    elif i[0]=='header': HeaderRows=datatype.num(i[1])
+    elif i[0]=='to': ToFile=i[1]
+    elif i[0]=='template': Template=i[1]
+    else: pass
+    
+if free: 
+  lf=len(free)
+  if lf>=2: FList=free[1:]
+else: err('Illegal parameters')
+
+# Main code
+FileList=[]
+for i in FList: FileList+=files.walk(i)
+
+NXL=False
+CatContent=[]
+for i in FileList:
+  $. close xl;
+  $. open =i .as xl;
+  if 'xl' in `.lw;` : 
+    sheets=$. lw xl/*;
+    sheet=sheets[0]
+    if NXL: 
+      if Horizontal: CatContent+=$. fetch .from =sheet+'/1:' .bycol
+      else: CatContent+=$. fetch .from =sheet+'/'+str(HeaderRows+1)+':'
+    else: 
+      if Horizontal: CatContent=$. fetch .from =sheet+'/1:' .bycol
+      else: CatContent=$. fetch .from =sheet+'/1:'
+      NXL=True
+
+  $. close xl;
+
+xl=$. new xl .template =Template .file =files.fpath(ToFile);
+if 'xl' in `.lw;` :
+  sheets=$. lw xl/*;
+  sheet=sheets[0]
+  if Horizontal: $. fetch =CatContent .to =sheet+'/A1' .bycol
+  else: $. fetch =CatContent .to =sheet+'/A1'
+  $. save xl;
+$. close xl;
+
+1
+
+  
+    

@@ -1,0 +1,81 @@
+import stdwb as wb, files, os 
+
+# Help information
+HelpInfo='''
+remove spaces of cells of all sheets in workbook
+format_record [xlsx file]
+'''
+# Variables & Functions
+la=len(args)
+File=''
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help'])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    
+if free: 
+  lf=len(free)
+  if lf==2:  File=free[1]
+  else: err('Illegal parameters')
+else: err('Illegal parameters')
+
+# Main code
+File=files.fpath(File)
+$. close w1;
+if os.path.isfile(File): # File exists
+  $. open =File .as w1;
+  for sheet in `.lw w1/*;`:
+    Ncols=$. shsize .col .num =sheet;
+    
+    #Nrows=$. shsize .row =sheet 
+    # A int
+    if sheet.strip()=='w1/Sheet1': 
+      IntList=('A', 'B')
+      StrList=('C', 'D', 'E', 'F', 'G', 'H', 'I', 'L', 'N', 'O', 'P', 'Q')
+      FloatList=('M',)
+    else:
+      IntList=('A', 'B', 'G')
+      StrList=('C', 'D', 'E', 'F', 'H')
+      FloatList=('I', 'J')
+
+    for Col in IntList:
+      ColList=$. fetch .bycol .from =sheet+'/'+Col
+      ColList=ColList[0]
+      for icell in range(len(ColList)):
+        if ColList[icell] is not None:
+          if type(ColList[icell]) is str: ColList[icell]=ColList[icell].strip()
+          else: ColList[icell]=int(ColList[icell])
+      ColList=[ColList]
+      $. fetch =ColList .bycol .to =sheet+'/'+Col
+    
+    # C-L: str
+    
+    for Col in StrList:
+      ColList=$. fetch .bycol .from =sheet+'/'+Col
+      ColList=ColList[0]
+      
+      for icell in range(len(ColList)): 
+        if ColList[icell] is not None: ColList[icell]=str(ColList[icell]).strip()
+      
+      ColList=[ColList]
+      $. fetch =ColList .bycol .to =sheet+'/'+Col
+
+    # M float
+    for Col in FloatList:
+      ColList=$. fetch .bycol .from =sheet+'/'+Col
+      ColList=ColList[0]
+      for icell in range(len(ColList)):
+        if ColList[icell] is not None:
+          if type(ColList[icell]) is str: ColList[icell]=ColList[icell].strip()
+          else: ColList[icell]=round(float(ColList[icell]), 2)
+      ColList=[ColList]
+      $. fetch =ColList .bycol .to =sheet+'/'+Col
+    
+  $. save w1;
+  $. close w1;
+
+else: err(File+' not exists')
+  
+    

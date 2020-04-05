@@ -1,0 +1,40 @@
+import stdwb as wb, files
+
+# Help information
+HelpInfo='''
+redirect the open workbook to a new xlsx file
+repath worktag -> return/show the current xlsx file of the open workbook
+repath worktag ~/Documents/newfile.xlsx -> redirect the xlsx file of the open workbook
+'''
+# Variables
+la=len(args)
+WorkTag=''
+File=''
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help'])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    
+if free:
+  lf=len(free)
+  if lf==2: WorkTag=free[1] # repath worktag
+  elif lf>=3: 
+    WorkTag=free[1]
+    File=free[2]
+  else: err('Wrong designations')
+    
+else: err('Wrong designations')
+
+# Main code
+if WorkTag in wb.wblist():
+  if File: wb.wbcls(WorkTag).p=files.fpath(File) # repath
+  p=wb.wbp(WorkTag)
+  cprint(p)
+  return p
+
+else: cprint(WorkTag+' not found')
+  
+    

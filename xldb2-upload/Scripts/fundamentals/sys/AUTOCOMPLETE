@@ -1,0 +1,80 @@
+import stdwb as wb, re, fnmatch
+
+def ListAll(a):
+  if a: 
+    w, s, c=wb.split_wbname(a)
+    if c:
+      s=c.split(':')  
+      return (s[-1], wb.headerlist(a), True) #/a/b/c...
+
+    elif s: # /a/b... or /a/b/
+      if a[-1]=='/': return ('', wb.headerlist(a), True) # /a/b/
+
+      else: return (s, wb.shlist(a), False) # /a/b...
+
+    elif w: # /a... or /a/
+      if a[-1]=='/': return ('', wb.shlist(a), False) # /a/
+
+      else: return (w, wb.wblist(), False) # /a...
+
+    elif a[-1]=='/': return ('', wb.wblist(), False) # /
+    
+    else: return ('', [], False)
+  else: return ('', [], False)
+
+if len(args)>1:
+  word=args[-1]
+  
+  if word: 
+    if word[-1]=="'" or word[-1]=='"': word=word[:-1] # ' or "
+    token=word.split()[-1] # OPEN ...
+  else: return 0, ['', '']
+
+  try: l=ListAll(token) # return matched list  
+  except:
+    try: l=ListAll(token+"'") # return matched list  
+    except: 
+      try: l=ListAll(token+'"') # return matched list 
+      except: return 0, ['', '']
+
+  
+  ResidueWord, List, IsCell=l
+  #cprint(ResidueWord)
+  if ResidueWord:
+    try:
+      rule=re.compile(fnmatch.translate(ResidueWord+'*'), re.IGNORECASE)
+    except:
+      rule=re.compile(fnmatch.translate('*'), re.IGNORECASE)
+    r=[len(ResidueWord)]
+  else: r=[0]
+  
+  if IsCell: #/a/b/c... /a/b/c:d... /a/b/
+    if ResidueWord:
+      for i in List: 
+        iL=i.split('.')
+        if len(iL)==1: 
+          Col=iL[0]
+          Name=''
+          
+        else: Name, Col=iL
+        if rule.match(Name): r.append((i,i))
+        elif rule.match(Col): r.append((Col, Col+': '+Name))
+        elif word[-1]==':': r.append((i,i))
+    else:
+      for i in List: r.append((i,i))
+
+  else:
+    if List:
+      for i in List:
+        if ResidueWord:
+          if rule.match(i): r.append((i, i))
+        else: r.append((i, i))
+
+    else: r.append(['' ,''])
+
+  return r
+
+else: return 0, ['', '']
+
+    
+    

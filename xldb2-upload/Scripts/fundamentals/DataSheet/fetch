@@ -1,0 +1,310 @@
+import stdwb as wb, re, dlist, datatype, datetime, fnmatch
+
+# Help information
+HelpInfo=''' 
+fetch -> fetches data from input/sheet/variable and write to sheet and returns the data list/dlist as data (str, datetime, bool, int, float, None)/dlist/list
+
+fetch =[data list/dlist] -> fetch from list/dlist
+fetch abc def 123 ;uvw ... (;data means to force the data as text format otherwise it converts to the appropriate data format)
+      123 or 123.00 to int
+      123.45 to float
+      2020-01-06, 2020-01-06-12:35:56 or 12:35:56 to datatime
+      True or False to bool
+      '' to None
+      others to str
+      ;123 to str as 123 (not ;123, if you want ;123, use ;;123)
+      -> fetch from data input
+fetch .txt 123 456 -> fetch from data input and forces the data format as str
+fetch .from /abc/def [/abc/def/A2:B3, /abc/def/Student.2:Gender.3 ...] -> fetch data from sheet
+fetch .to /abc/def [/abc/def/A2, /abc/def/Student.2] -> write data to sheet
+fetch .cell -> grab cell but not values only
+fetch .bycol -> transpose the list
+fetch .help -> show help
+
+fetch .index .header/.col Student. Gender. C Age.D .from /abc/def [/abc/def/B3:D10...] .to /uvw/xyz [/uvw/xyz/D8] .where {Student.}=='Tom' and {Age.B}>35 -> fetch certain data columns (.index w/ index or .header/.col w/ header (Student.) or col (A) only available for where clause) from sheet to sheet under certain conditions
+      under .where, .idx. represents index #
+1. where clause should only be string expression. If you want to designate True, just use 'True' but not a bool True
+2. */？ wildcard expression can be used in fetch * .from ... .to ... .where ...
+3. Print out headers only: fetch .header .from w/s .where False
+4. fetch .from w/s/c .where [Condition]: c is useless when .where exists
+'''
+# Variables
+#la=len(args)
+FromFile=''
+ToFile=''
+CondExpr=''
+InputTxt=False # .txt
+WithHeader=False # .header
+WithCol=False # .col
+WithIndex=False # .index
+ValueOnly=True
+ByCol=False
+Match=False
+Data=[] # Data from direct input
+Sequence=False # direct input is list/dlist
+r=None # return data
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, pkey=['from', 'to', 'where'], nkey=['txt', 'header', 'index', 'cell', 'bycol', 'help', 'col', 'match'])
+
+if opts:
+  for i in opts:
+    if i[0]=='from': FromFile=i[1]
+    elif i[0]=='to': ToFile=i[1]
+    elif i[0]=='where': CondExpr=i[1]
+    elif i[0]=='txt': InputTxt=True
+    elif i[0]=='header': WithHeader=True
+    elif i[0]=='col': WithCol=True
+    elif i[0]=='index': WithIndex=True
+    elif i[0]=='match': Match=True
+    elif i[0]=='cell': ValueOnly=False
+    elif i[0]=='bycol': ByCol=True
+    elif i[0]=='help': err(HelpInfo)
+    
+lf=len(free)      
+if lf>=2:
+  if type(free[1]) in (tuple, list): 
+    Data=free[1]
+    Sequence=False
+  else: 
+    Data=free[1:]
+    Sequence=True
+elif lf<2 and FromFile: pass
+else: Data=_RTN # get from tunnel
+
+# Main code
+class line_parser:
+  __String=''
+  def __init__(self, String):
+    if String[-1] != '\n': String+='\n'
+    self.__String=String
+
+  def __quotation_strings(self):
+    QuotationPattern='''(?<!\\\\)'.*?(?<!\\\\)'|(?<!\\\\)".*?(?<!\\\\)"''' # '...' or "...", ... means anything between quotations
+    p=re.compile(QuotationPattern)
+    return [(i.group(),i.span()[0],i.span()[1]) for i in p.finditer(self.__String)]
+
+  def is_inside_quotation(self, MatchObj):
+    for i in self.__quotation_strings():
+      c, s, e=i
+      StartPos=MatchObj.span()[0]
+      if StartPos>=s and StartPos<e: return True
+    else: return False
+  
+  def match_all(self, Pattern):
+    p=re.compile(Pattern)
+    return [(i.group(),i.span()[0],i.span()[1], self.is_inside_quotation(i)) for i in p.finditer(self.__String)] # (content, start_pos, end_pos, is_inside_quotation)
+
+  def sub(self, Pattern, Repl):
+    p=re.compile(Pattern)
+    self.__String=p.sub(Repl,self.__String)
+
+  def string(self):
+    return self.__String
+
+def _parse_expr(Str, i, w, s):
+  L=line_parser(Str)
+  
+  def sub_cmd(m): # {Student.}  {.idx.} is index
+    SubIndex=False
+    Cell=m.group()[1:-1] # Student. 
+    if Cell.strip()=='.idx.': 
+      SubIndex=True
+      Sub=str(i)
+    else:
+      ColName, Col, Row=wb.cellname(wb.compose(w, s, Cell+str(i)))[:3]
+      Sub=wb.compose(w, s, Col+Row)
+
+    if not L.is_inside_quotation(m): 
+      if SubIndex: return Sub 
+      else: return 'wb.read("""'+Sub+'""")' 
+      
+    else: return m.group()
+  L.sub('(?<!\\\\)\{.*?(?<!\\\\)\}',sub_cmd)
+  
+  return L.string()
+
+if FromFile: # .from
+  w, s, c=wb.split_wbname(FromFile)
+  if w not in wb.wblist(): err('Workbook ('+w+') not open')
+  if s not in wb.shlist(w): err('Worksheet ('+s+') not exists')
+  if not c: c='A1:'
+  
+  BeginColName, BeginCol, BeginRow, EndColName, EndCol, EndRow=wb.cellname(wb.compose(w, s, c))
+  
+  #cprint(wb.cellname(wb.compose(w, s, c)))
+  cp=wb.compose(w,s)
+  MaxCol=wb.num2col(wb.maxcol(cp))
+  MaxRow=str(wb.maxrow(cp))
+  
+  if c and not CondExpr: 
+
+    if BeginColName and not BeginCol: err('Column ('+BeginColName+') not exists')
+    if EndColName and not EndCol: err('Column ('+EndColName+') not exists')
+
+    if ':' in c: # A: , Student.:Gender. ...
+      if not BeginCol: BeginCol='A'
+      if not BeginRow: BeginRow='1'
+      if not EndCol: EndCol=MaxCol
+      if not EndRow: EndRow=MaxRow
+      c=BeginCol+BeginRow+':'+EndCol+EndRow
+    else: # no :
+      if BeginCol:
+        if not BeginRow: 
+          BeginRow='1'
+          EndRow=str(wb.maxrow(wb.compose(w,s)))
+          c=BeginCol+BeginRow+':'+BeginCol+EndRow # A -> A1:A100 (100 is the max row)
+        else: c=BeginCol+BeginRow # A1
+      else: c=BeginRow # '1', '2', ...
+
+    if int(BeginRow)<1: err('Initial row ('+BeginRow+') should be >= 1')
+    if int(BeginRow)>int(MaxRow): BeginRow=MaxRow
+    if EndRow:
+      if int(EndRow)<1: err('End row ('+EndRow+') should be >= 1')
+      if int(EndRow)>int(MaxRow): EndRow=MaxRow
+      if int(BeginRow)>int(EndRow): err('Initial row ('+BeginRow+') should be <= end row('+EndRow+')')
+    if BeginCol:
+      if wb.col2num(BeginCol)>wb.col2num(MaxCol): BeginCol=MaxCol
+    if EndCol:
+      if wb.col2num(EndCol)>wb.col2num(MaxCol): EndCol=MaxCol
+      if wb.col2num(BeginCol)>wb.col2num(EndCol): err('Initial Col ('+BeginCol+') should be <= end col('+EndCol+')')
+
+    cellpath=wb.compose(w, s, c)
+    #cprint(cellpath)
+
+  #else: cellpath=wb.compose(w, s) # all sheet
+
+  if CondExpr: # .where
+    r=[]
+    SelectCols=[]
+    if Data:
+      # header list  
+      NameList=[]
+      ColList=[]
+      for i in wb.headerlist(wb.compose(w,s)):
+        if '.' in i: 
+          colname, col=i.split('.')
+        else:
+          colname=''
+          col=i
+        NameList.append(colname)
+        ColList.append(col)
+
+      for i in Data: # Data: select cols list
+        
+        if '.' in i: 
+          iColName, iCol=i.split('.') 
+
+          if iCol: SelectCols+=fnmatch.filter(ColList, iCol) # student.A 
+          else: # Student.
+            for n in range(len(NameList)):
+              
+              if iColName and fnmatch.fnmatch(NameList[n], iColName): SelectCols.append(ColList[n])
+
+        else: SelectCols+=fnmatch.filter(ColList, i)
+        
+        TempSelectCols=[]
+        for i in SelectCols:
+          if i not in TempSelectCols: TempSelectCols.append(i)
+        SelectCols=TempSelectCols
+        
+    for i in range(2, int(MaxRow)+1):
+      Expr=_parse_expr(CondExpr, i, w, s)
+      try: BoolExpr=eval(Expr)
+      except: BoolExpr=False
+      
+      if BoolExpr:  # if CondExpr is True
+        DataRow=wb.read(wb.compose(w, s, str(i)), ValueOnly)
+        if SelectCols: AppData=[DataRow[i-1] for i in map(wb.col2num, SelectCols)]
+        else: AppData=[]
+        if WithIndex: AppData=[i]+list(AppData)
+        r.append(AppData)
+
+    if WithHeader or WithCol:
+      if WithHeader: SelectCols=[wb.read(wb.compose(w, s, i+'1'), ValueOnly) for i in SelectCols]
+      if WithIndex: SelectCols=['idx']+SelectCols
+      r=[SelectCols]+r
+
+  else: r=wb.read(cellpath, ValueOnly) # no .where
+  
+else: # direct input
+  if Sequence: #  abc def ...
+    if InputTxt: r=Data # .txt
+    else: # no .txt
+      r=[]
+      for i in Data:
+        if type(i) is str:
+          if i.startswith(';') : r.append(i[1:])
+          else: r.append(datatype.str2data(i))
+        else: r.append(i)
+
+  else: r=Data # =[...]
+
+if ByCol: r=dlist.transpose(r)
+
+Rtn=r
+
+if ToFile: # .to
+  BeginColName, BeginCol, BeginRow=wb.cellname(ToFile)[:3]
+  w, s, c=wb.split_wbname(ToFile)  
+  if w not in wb.wblist(): err('Workbook ('+w+') not open')
+  if s not in wb.shlist(w): err('Worksheet ('+s+') not exists')
+  if not BeginCol: 
+    if BeginColName: err('Column ('+BeginColName+') not exists')
+    else: BeginCol='A'
+  if not BeginRow: BeginRow='1'
+  if int(BeginRow)<1: err('Row number ('+BeginRow+') should be >=1')
+  c=BeginCol+BeginRow
+  cellpath=wb.compose(w, s, c)
+  
+  tr=type(r)
+  tNone=type(None)
+  WriteableTypes=(tuple, list, str, int, float, bool, tNone, datetime.datetime, xl.cell.cell.Cell)
+  Writeable=(str, int, float, bool, tNone, datetime.datetime, xl.cell.cell.Cell)
+  
+  if tr in (tuple, list):
+    if dlist.is_dlist_alike(r):
+      r=list(r)
+      for Row, iRow in zip(r, range(len(r))):
+        r[iRow]=list(Row)
+        for i in range(len(Row)):
+          if type(Row[i]) not in Writeable: r[iRow][i]=str(Row[i]) 
+
+    else: 
+      r=[i if type(i) in Writeable else str(i) for i in r]
+
+    #cprint(r)
+  
+  if Match:
+    if WithHeader: 
+      BeginRow='2'
+      HeaderList=r[0]
+      r=r[1:]
+    if WithIndex: 
+      IndexList=[i[0] for i in r]
+      for n in range(len(r)): r[n]=r[n][1:] 
+        
+    nRow=BeginRow
+    
+    for Row in r:
+      nCol=BeginCol
+      for n in range(len(Row)):
+        if type(Row[n]) in Writeable: Data=Row[n]
+        else: Data=str(Row[n])
+        
+        if WithHeader: # match col
+          Col=wb.exheader_col(w, s, Header=HeaderList[n])[1]
+          if Col: wb.write(wb.compose(w, s, Col+nRow), Data)
+        elif int(nRow) in IndexList: wb.write(wb.compose(w, s, nCol+nRow), Data) # match index
+
+        nCol=wb.add_cell(nCol, col=1)
+      nRow=str(int(nRow)+1) 
+
+  else:
+    if tr in WriteableTypes: wb.write(cellpath, r)
+    else: wb.write(cellpath, str(r))
+
+return Rtn
+
+
+    

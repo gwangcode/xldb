@@ -1,0 +1,533 @@
+import stdwb as wb, styledtext as st, dlist, curses as cur
+from commonstyle import cread
+
+# Help information
+HelpInfo='''
+<curvisible=false>
+<forecolor=-1 mode=normal line=0|view =[dlist/list/tuple] -\> view dlist, list, tuple>
+<line=1.1|view /a/b -\> view sheet>
+<line=1.1|view -\> show help>
+<line=1.1|Keys:>
+<line=1.1|Q: quit view>
+<line=1.1|?: show help>
+<line=1.1|Keys for focus on table:>
+<line=1.1|l: move right a col>
+<line=1.1|j: move left a col>
+<line=1.1|i: move up a row>
+<line=1.1|k: move down a row>
+<line=1.1|e: move up a page>
+<line=1.1|d: move down a page>
+<line=1.1|s: move left a page>
+<line=1.1|f: move right a page>
+<line=1.1|x: set/unset the first line as the header>
+<line=1.1|v: move cursor to the last line to view the full data in a cell>
+<line=1.1|t: move to table top>
+<line=1.1|b: move to table bottom>
+<line=1.1|a: move to first col of table>
+<line=1.1|g: move to the last col of table>
+<line=1.1|y: move to the top on the screen>
+<line=1.1|n: move to the bottom on the screen>
+<line=1.1|h: move to the left most of the screen>
+<line=1.1|;: move to the right most of the screen>
+<line=1.1|p: move to the column header>
+<line=1.1|u: move to the index>
+<line=1.1|[: shrink the cell width>
+<line=1.1|]: widen the cell width>
+<line=2.1|Keys for focus on the bottom line (cell data line)>
+<line=1.1|j: move left a char>
+<line=1.1|l: move right a char>
+<line=1.1|;: move cursor to the right most on the screen>
+<line=1.1|h: move cursor to the left most of the screen>
+<line=1.1|f: move right a page>
+<line=1.1|s: move left a page>
+<line=1.1|a: move to the first char of the cell data line>
+<line=1.1|g: move to the end of the data line>
+<line=1.1|r: move cursor back to the table>
+
+'''
+# Variables
+#la=len(args)
+#ShowHelp=False
+
+Help=False
+
+class vars:
+  cwidth=10
+  FixHeader=False
+  OnTable=True
+  offX=offY=focusX=focusY=0
+  CurX=0
+  CurY=0
+  endmode='normal'
+  endforecolor='0'
+  endbackcorlor='231'
+  cursorX=None
+  FirstCharPos=0
+  text=''
+  data=None
+  enddata=''
+  prompt=''
+  ShowHelp=False
+  
+  HelpText=''
+  HelpOffX=HelpOffY=0
+
+pvars=vars()
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, pkey=['width'], nkey=['help'])
+
+if opts:
+  for i in opts:
+    if i[0]=='width': cwidth=i[1] # cell width
+    if i[0]=='help': Help=True # cell width
+
+if len(free)>1: data=free[1]
+else: data=_RTN
+  
+
+# Main code
+
+#scrlines, scrcols=t.win_size()
+# ScrLines: screen lines
+# ScrCols: scrreen cols
+# data: tuple, list, sheet object: xl.worksheet.worksheet.Worksheet
+# focus=(row, col), row=-1: on the col; col=-1: on the row; both -1's: on the title
+# offset=(row, col)
+def data2styledtext(ScrLines, data, data_size_only=False, MaxRows=None, focus=(0,0), offset=(0,0), fixheader=False, headerforecolor='1', headerbackcolor='255', headermode='bold', cwidth='10', barforecolor='0', barbackcolor='231', barmode='normal', datamode='normal', dataforecolor='0', strforecolor='2', databackcolor='231', crossbackcolor='250'):
+  BeginRow, BeginCol=offset
+  IsWorksheet=False
+  penddata=enddata=None
+  cwidth=int(cwidth)
+  bar='<col=0.1 forecolor='+barforecolor+' backcolor='+barbackcolor+' mode='+barmode+'|\|>'
+  #text='<curvisible='+curvisible+' cury='+str(ScrLines-1)+'>
+  #if curx: st.write_property('curx', curx)
+  text='<line=0 col=0 forecolor='+headerforecolor+' backcolor='+headerbackcolor+' |'+' '*cwidth+'>'+bar
+  # data
+  if type(data) is xl.worksheet.worksheet.Worksheet: 
+    IsWorksheet=True
+    # title
+    title=st.split_by_width_once(data.title,cwidth,True)
+    if type(title) in (list, tuple): title=title[0]
+    tbar=bar
+    tbar=st.write_property('backcolor', headerbackcolor,tbar)
+    #text='<curvisible='+curvisible+' cury='+str(ScrLines-1)+'>
+    #if curx: st.write_property('curx', curx)
+    text='<line=0 col=0 mode='+headermode+' forecolor='+headerforecolor+' backcolor='+headerbackcolor+' |'+title+'>'+tbar
+    if focus==(-1, -1):
+      text='<line=0 col=0 mode='+headermode+' forecolor='+headerforecolor+' backcolor='+crossbackcolor+' |'+title+'>'+tbar
+      penddata=data.title
+    MaxRow=data.max_row
+    MaxCol=data.max_column
+    rdata=data.rows
+    if pvars.data is None:
+      pvars.data=[]
+      for i in range(MaxRow): pvars.data.append([None]*MaxCol)
+      for row in rdata: 
+        for cell in row: pvars.data[cell.row-1][cell.column-1]=cell
+      pvars.data=tuple(pvars.data)
+    data=pvars.data
+
+  if type(data) in (tuple, list):
+    # header
+    if dlist.is_dlist_alike(data): # dlist
+      data=dlist.complete(data)
+      NRows, NCols=dlist.dimension(data)
+      if data_size_only: return NRows, NCols
+      for i in range(BeginCol,NCols):
+        if IsWorksheet: rawheader=wb.num2col(i+1)
+        else: rawheader=str(i)
+        header=st.split_by_width_once(rawheader,cwidth,True)
+        if focus[0]==-1 and focus[1]==i: penddata=rawheader
+        if type(header) in (list, tuple): header=header[0]
+        
+        s='<mode='+headermode+' forecolor='+headerforecolor+' backcolor='+headerbackcolor+' line=0 col=0.1|'+header+'>'
+        if focus[1]==i and focus[0]==-1: s=st.write_property('backcolor', crossbackcolor, s)
+        tbar=st.write_property('backcolor', headerbackcolor, bar)
+        #cprint(s)
+        text+='\n'+s+tbar
+
+      if fixheader:
+        
+        # index
+        if IsWorksheet: HeaderIndex='1'
+        else: HeaderIndex='0'
+        nrow=st.split_by_width_once(HeaderIndex,cwidth,True)
+        if nrow in (tuple, list): nrow=nrow[0]
+
+        s='<forecolor='+headerforecolor+' backcolor='+headerbackcolor+' mode='+headermode+' line='+str(1)+' col=0 |'+nrow+'>'
+        if focus[0]==1 and focus[1]==-1: 
+          s='<forecolor='+headerforecolor+' backcolor='+crossbackcolor+' mode='+headermode+' line='+str(1)+' col=0 |'+nrow+'>'
+          penddata=HeaderIndex
+        
+        #tbar=bar
+        #if fixheader and irow==0: tbar=st.write_property('backcolor', headerbackcolor, tbar)
+
+        #if focus[0]==irow: 
+          #s=st.write_property('backcolor', crossbackcolor, s)
+          #tbar=st.write_property('backcolor', crossbackcolor, tbar)
+        #cprint(s)
+        text+='\n'+s+tbar
+
+        # header line
+        for cell, icol in zip(data[0][BeginCol:], range(len(data[0][BeginCol:]))):
+         
+          if IsWorksheet: 
+            if cell is None:
+              if type(cell)==str: dforecolor=strforecolor
+              else: dforecolor=dataforecolor
+              s='<mode='+datamode+' forecolor='+dforecolor+' backcolor='+headerbackcolor+' line='+str(1)+' col=0.1|'+cwidth*' '+'>'
+              
+            else:
+              s=cread(cell, Mode='Console')
+              enddata=cell.value
+              cellpos=st.grab_property('cell',s)
+              s=st.write_property('line', 1, s)
+              s=st.write_property('col', 0.1, s)
+              cell=st.grab_text(s)
+              celldata=st.split_by_width_once(cell,cwidth,True)
+              if type(celldata) in (list, tuple): celldata=celldata[0]
+              s=st.write_property('backcolor', headerbackcolor, s)
+              s=st.write_text(celldata, s)
+              
+              
+          else: 
+            celldata=st.split_by_width_once(str(cell),cwidth,True)
+            if type(celldata) in (list, tuple): celldata=celldata[0]
+            if type(cell)==str: dforecolor=strforecolor
+            else: dforecolor=dataforecolor
+            s='<mode='+datamode+' forecolor='+dforecolor+' backcolor='+headerbackcolor+' line='+str(1)+' col=0.1|'+celldata+'>'
+            enddata=cell
+          
+          tbar=st.write_property('backcolor', headerbackcolor,tbar)
+            
+          if (1,icol+BeginCol)==focus: penddata=enddata ##??
+          
+          if icol+BeginCol==focus[1]: s=st.write_property('backcolor',crossbackcolor,s) ##??
+          
+          if 1==focus[0]: tbar=st.write_property('backcolor', crossbackcolor, tbar) ##?
+          #cprint(s)
+          text+='\n'+s+tbar
+
+          if BeginRow==0: BeginRow=1
+
+      data=data[BeginRow:BeginRow+MaxRows]
+      
+
+  
+      #else: 
+      #  data=data[BeginRow:]
+      #  IsHeaderRow=False
+        #dn=0
+  
+      for row, irow in zip(data, range(len(data))):
+        #cprint(row)
+        # index
+        if IsWorksheet: 
+          if row[0] is None: rawnrow=str(irow+BeginRow+1)
+          else: rawnrow=str(row[0].row)
+        else: rawnrow=str(irow+BeginRow)
+        nrow=st.split_by_width_once(rawnrow,cwidth,True)
+        if nrow in (tuple, list): nrow=nrow[0]
+
+        s='<forecolor='+headerforecolor+' backcolor='+headerbackcolor+' mode='+headermode+' line='+str(irow+int(fixheader)+1)+' col=0 |'+nrow+'>'
+        if focus[0]==irow+BeginRow and focus[1]==-1: 
+          s=st.write_property('backcolor', crossbackcolor,s)
+          penddata=rawnrow
+
+        tbar=bar
+        
+        if focus[0]==irow+BeginRow: 
+          s=st.write_property('backcolor', crossbackcolor, s)
+          tbar=st.write_property('backcolor', crossbackcolor, tbar)
+        #cprint(s)
+        text+='\n'+s+tbar
+        
+        # cell data
+        for cell, icol in zip(row[BeginCol:], range(len(row))):
+          if IsWorksheet: 
+            if cell is None:
+              if type(cell)==str: dforecolor=strforecolor
+              else: dforecolor=dataforecolor
+              
+              s='<mode='+datamode+' forecolor='+dforecolor+' backcolor='+databackcolor+' line='+str(irow+int(fixheader)+1)+' col=0.1|'+cwidth*' '+'>'
+              
+            else:
+              ######################################
+              s=cread(cell, Mode='Console')
+              enddata=cell.value
+              cellpos=st.grab_property('cell',s)
+              i_col, i_row=wb._single_cell_name(cellpos)[1:]
+              s=st.write_property('line', irow+int(fixheader)+1, s)   
+              s=st.write_property('col', 0.1, s)
+              cell=st.grab_text(s)
+              celldata=st.split_by_width_once(str(cell),cwidth,True)
+              if type(celldata) in (list, tuple): celldata=celldata[0]
+              s=st.write_text(celldata, s)
+              
+              
+          else: 
+            if type(cell) is xl.cell.cell.Cell:
+              s=cread(cell, Mode='Console')
+              enddata=cell.value
+              cellpos=st.grab_property('cell',s)
+              i_col, i_row=wb._single_cell_name(cellpos)[1:]
+              s=st.write_property('line', irow+int(fixheader)+1, s)   
+              s=st.write_property('col', 0.1, s)
+              cell=st.grab_text(s)
+              celldata=st.split_by_width_once(str(cell),cwidth,True)
+              if type(celldata) in (list, tuple): celldata=celldata[0]
+              s=st.write_text(celldata, s)
+
+            else:
+              celldata=st.split_by_width_once(str(cell),cwidth,True)
+              if type(celldata) in (list, tuple): celldata=celldata[0]
+              if type(cell)==str: dforecolor=strforecolor
+              else: dforecolor=dataforecolor
+              s='<mode='+datamode+' forecolor='+dforecolor+' backcolor='+databackcolor+' line='+str(irow+int(fixheader)+1)+' col=0.1|'+celldata+'>'
+              enddata=cell
+          tbar=bar
+          
+          if (irow+BeginRow,icol+BeginCol)==focus: penddata=enddata
+          
+          if irow+BeginRow==focus[0] or icol+BeginCol==focus[1]: s=st.write_property('backcolor',crossbackcolor,s)
+          
+          if irow+BeginRow==focus[0]: tbar=st.write_property('backcolor', crossbackcolor, tbar)
+          #cprint(s)
+          text+='\n'+s+tbar
+    
+      #Endline=ScrLines-1
+      #text+='<mode='+endmode+' forecolor='+endforecolor+' backcolor='+endbackcorlor+' line='+str(Endline)+' col=0|'+penddata+'>'
+      return text, penddata, NRows, NCols
+
+
+
+if not Help:
+
+  if type(data) is str and wb.wb_exists(data):
+    if wb.split_wbname(data)[1] is not None: sheet=wb.shto(data)
+    else: err('No sheet designated')
+    
+  elif dlist.is_dlist_alike(data): 
+    if data: sheet=data
+    else: 
+      cprint(data)
+      return data
+  else: 
+    cprint(data)
+    return data
+
+  lp=st.loop()
+  t=st.styledtext(lp.scr)
+
+  # construct view
+  def handle_key(Key):
+    #global FixHeader, cwidth, OnTable, offX, offY, focusX, focusY
+    #key_perform=True
+    scrlines, scrcols=t.win_size() # screen lines & cols
+    DataRows, DataCols=data2styledtext(scrlines-1, sheet, data_size_only=True) # text: '<><>...'; enddata: cell full data; DataRows: total rows of data; DataCols: total cols of data
+    NColsOnScr=(scrcols-pvars.cwidth-1)//(pvars.cwidth+1) # n cols on a screen
+    NRowsOnScr=(scrlines-2-int(pvars.FixHeader)) # n cols on a screen
+    # n screens over x
+    NScreenX=DataCols//NColsOnScr
+    if DataCols%NColsOnScr: NScreenX+=1
+    
+    # n screens over y
+    NScreenY=DataRows//NRowsOnScr
+    if DataRows%NRowsOnScr: NScreenY+=1
+
+    if Key=='Q': lp.quit=True # quit
+    elif Key=='?': pvars.ShowHelp=not pvars.ShowHelp
+    elif pvars.OnTable:
+      if Key=='l': # right arrow: move right a cell/endtext: move right a char
+        if pvars.focusX<DataCols-1: pvars.focusX+=1
+        if pvars.offX+NColsOnScr-1<pvars.focusX: pvars.offX+=1
+
+        #offX=focusX//NColsOnScr*NColsOnScr
+      elif Key=='j': # left arrow: move left a cell/endtext: move left a char
+        if pvars.focusX>0: pvars.focusX-=1
+        if pvars.focusX<pvars.offX: pvars.offX-=1
+        
+
+      elif Key=='i': # up arrow: move up a cell
+        if pvars.focusY>0: pvars.focusY-=1
+        if pvars.focusY<pvars.offY: pvars.offY-=1
+
+      elif Key=='k': # down arrow: move down a cell
+        if pvars.focusY<DataRows-1: pvars.focusY+=1
+        if pvars.offY+min(NRowsOnScr, DataCols)-1<pvars.focusY: pvars.offY+=1
+        
+      elif Key=='e': # page up: move up a page
+        if pvars.offY>0: pvars.offY=max(pvars.offY-NRowsOnScr,0)
+        pvars.focusY=pvars.offY
+
+      elif Key=='d': # page down: move down a page
+        #if pvars.offY+NScreenY<DataRows: pvars.offY+=NScreenY
+        if DataRows-pvars.offY>NRowsOnScr: pvars.offY+=NRowsOnScr
+        pvars.focusY=pvars.offY
+
+      elif Key=='s': # page left: move left a page
+        if pvars.offX>0: pvars.offX=max(pvars.offX-NColsOnScr,0)
+        pvars.focusX=pvars.offX
+
+      elif Key=='f': # page right: move right a page/endtext: move right a page
+        if DataCols-pvars.offX>NColsOnScr: pvars.offX+=NColsOnScr
+        pvars.focusX=pvars.offX
+        
+      elif Key=='x': pvars.FixHeader=not pvars.FixHeader  # h: fix header on/off /endtext: move left a page
+        
+      elif Key=='v': # v: enddata
+          pvars.OnTable=False
+          pvars.cursorX=-1
+
+      elif Key=='t': pvars.offY=pvars.focusY=0 # go to top
+        
+      elif Key=='b': # go to bottom
+        pvars.offY=(NScreenY-1)*NRowsOnScr
+        pvars.focusY=DataRows-1
+        
+      elif Key=='a': pvars.offX=pvars.focusX=0  # go to left most
+        
+      elif Key=='g': # go to right most
+        pvars.offX=(NScreenX-1)*NColsOnScr
+        pvars.focusX=DataCols-1
+        
+      elif Key=='y': pvars.focusY=pvars.offY # go to top most on screen
+
+      elif Key=='n': pvars.focusY=pvars.offY+min(NRowsOnScr, DataRows-pvars.offY)-1 # go to bottom most on screen
+      
+      elif Key=='h': pvars.focusX=pvars.offX  # go to left most on screen
+      
+      elif Key==';': pvars.focusX=pvars.offX+min(NColsOnScr, DataCols-pvars.offX)-1 # go to right most on screen
+        
+      elif Key=='p':  # go to column header
+        if pvars.focusY==-1: pvars.focusY=pvars.CurY
+        else:
+          pvars.CurY=pvars.focusY
+          pvars.focusY=-1
+      
+      elif Key=='u': # go to index
+        if pvars.focusX==-1: pvars.focusX=pvars.CurX
+        else:
+          pvars.CurX=pvars.focusX
+          pvars.focusX=-1
+        
+      elif Key=='[': # [: shrink cell width a char
+        if pvars.cwidth>2: pvars.cwidth-=1
+      elif Key==']': # ]: widen cell width a char
+        if pvars.cwidth<int(scrcols/2)-1: pvars.cwidth+=1
+
+    if pvars.OnTable: 
+      pvars.text, pvars.enddata, DataRows, DataCols=data2styledtext(scrlines-1, sheet, MaxRows=scrlines-2, offset=(pvars.offY, pvars.offX), focus=(pvars.focusY, pvars.focusX), cwidth=pvars.cwidth, fixheader=pvars.FixHeader) # text: '<><>...'; enddata: cell full data; DataRows: total rows of data; DataCols: total cols of data
+      pvars.prompt='('+type(pvars.enddata).__name__+')>'
+
+    
+    lprompt=len(pvars.prompt)
+    pvars.enddata=str(pvars.enddata)
+    if pvars.cursorX==-1: pvars.cursorX=lprompt
+    NCharsOnScr=scrcols-lprompt-1
+
+    if not pvars.OnTable:
+      if Key=='j': # move left a char
+        if pvars.cursorX>lprompt: pvars.cursorX-=1
+        elif pvars.FirstCharPos>0: pvars.FirstCharPos-=1
+      
+      elif Key=='l': # move right a char
+        l_enddata=len(pvars.enddata)
+        if pvars.cursorX<min(scrcols-1, lprompt+len(pvars.enddata)): pvars.cursorX+=1
+        elif (l_enddata-pvars.FirstCharPos)>NCharsOnScr and pvars.FirstCharPos<l_enddata: pvars.FirstCharPos+=1
+      
+      elif Key==';': # move cursor to the end line on screen
+        pvars.cursorX=min(scrcols-1, lprompt+len(pvars.enddata)-pvars.FirstCharPos)
+
+      elif Key=='h': # move cursor to the head of line
+        pvars.cursorX=lprompt
+
+      elif Key=='f': # move right a page
+        if len(pvars.enddata[pvars.FirstCharPos:])>NCharsOnScr: pvars.FirstCharPos+=min(NCharsOnScr, len(pvars.enddata)-pvars.FirstCharPos)+1
+        pvars.cursorX=min(pvars.cursorX, lprompt+len(pvars.enddata)-pvars.FirstCharPos)
+
+      elif Key=='s': # move left a page
+        if len(pvars.enddata[:pvars.FirstCharPos])>0: pvars.FirstCharPos=max(pvars.FirstCharPos-NCharsOnScr-1,0)
+        #pvars.cursorX=lprompt
+      
+      elif Key=='a': # move to first char of enddata
+        pvars.FirstCharPos=0
+        pvars.cursorX=lprompt
+
+      elif Key=='g': # move to the end of enddata
+        pvars.FirstCharPos=max(pvars.FirstCharPos,len(pvars.enddata)-NCharsOnScr)
+        pvars.cursorX=lprompt+len(pvars.enddata)-pvars.FirstCharPos
+      
+      elif Key=='r': # change to table
+          pvars.OnTable=True
+          pvars.cursorX=None
+
+    texthead='<curvisible='+str(not pvars.OnTable)+' curx='+str(pvars.cursorX)+'>'
+    s='<mode='+pvars.endmode+' forecolor='+pvars.endforecolor+' backcolor='+pvars.endbackcorlor+' line='+str(scrlines-1)+' col=0|>'
+    s=st.write_text(pvars.prompt+pvars.enddata[pvars.FirstCharPos:],s)
+    text=texthead+pvars.text+s
+
+    if pvars.ShowHelp: text=HelpInfo
+    t.print(text)
+  
+  lp.run(Func=handle_key)
+     
+else:
+  lp=st.loop()
+  t=st.styledtext(lp.scr)
+
+  def max_offset(completeHelpInfoList, scrlines, scrcols):
+    MaxWidth=max(map(st.grab_text_width, completeHelpInfoList))
+    MaxHeight=len(completeHelpInfoList)
+    MaxOffX=max(0,MaxWidth-scrcols)
+    MaxOffY=max(0,MaxHeight-scrlines)
+    return MaxOffX, MaxOffY
+
+
+  def text2styledtext(completeHelpInfoList, MaxOffX, MaxOffY, OffX=0, OffY=0):
+    r=[]
+    
+    offset_x=min(MaxOffX, max(0, OffX))
+    offset_y=min(MaxOffY, max(0, OffY))
+    
+    for l in completeHelpInfoList[1:]:
+      line=int(st.grab_property('line',l))
+      dy=line-offset_y
+      if dy>=0:
+        txt=st.write_property('line', dy, l)
+
+        spl_txt=st.split_bracket_by_width(offset_x, txt, SpaceSupplement=True, Once=True)
+        if len(spl_txt)>1:
+          col=st.grab_property('col',spl_txt[1])
+          if col:
+            dx=int(col)-offset_x
+            if dx>=0:
+              txt=st.write_property('col', dx, spl_txt[1])
+              r.append(txt)
+    return completeHelpInfoList[0]+'\n'.join(r) 
+        
+
+  
+  def help_key(Key):
+    scrlines, scrcols=t.win_size() # screen lines & cols
+    tL=t.complete_text(HelpInfo, AsList=True)
+    MaxOffX, MaxOffY=max_offset(tL,scrlines,scrcols)
+    if Key=='Q': lp.quit=True # quit
+    elif Key=='l': # move right a char
+      if pvars.HelpOffX<MaxOffX: pvars.HelpOffX+=1
+    elif Key=='j': # move left a char 
+      if pvars.HelpOffX>0: pvars.HelpOffX-=1
+    elif Key=='k': # move down a char
+      if pvars.HelpOffY<MaxOffY: pvars.HelpOffY+=1
+
+    elif Key=='i': # move up a char
+      if pvars.HelpOffY>0: pvars.HelpOffY-=1
+    
+
+    text=text2styledtext(tL, MaxOffX, MaxOffY, OffX=pvars.HelpOffX, OffY=pvars.HelpOffY)
+    t.print(text)
+  
+  lp.run(Func=help_key)
+  
+

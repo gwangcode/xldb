@@ -1,0 +1,120 @@
+import stdwb as wb
+Workbook=args[1]
+#GoodsDB=args[2]
+sheet2=wb.compose(Workbook, 'Sheet2')
+sheet1=wb.compose(Workbook, 'Sheet1')
+
+#GoodsDatabase=$. fetch .from GoodsDB/Sheet1/A2:F
+#DBItemNames=$. fetch .from GoodsDB/Sheet1/A2:A .bycol
+#DBNewNames=$. fetch .from GoodsDB/Sheet1/D2:D .bycol
+
+ProcessedTrackingNums=[]
+SpecialGoodsTrackingNums=[]
+
+def get_box_weight(Tracking, sheet1=sheet1):
+  Nrows=$.shsize .row =sheet1;
+  r=$. fetch M .where str({B}).strip()==str(Tracking).strip() .from =sheet1;
+  return r[0][0]
+
+# Sheet2
+#NCol=$.shsize .col .num =sheet2
+Ncols=`.shsize .col .num =sheet2;`
+Nrows=`.shsize .row =sheet2;`
+
+class Item:
+  BoxNum=0
+  Row=0
+  ItemName=''
+  Spec=''
+  Brand=''
+  Num=0
+  Unit=''
+  Price=0
+  NetWeight=0
+
+  def __init__(self, BoxNum=0, ItemName='', Spec='', Brand='', Num=0, Unit='', Price=0, NetWeight=0, Row=0):
+    self.BoxNum=BoxNum
+    self.ItemName=ItemName
+    self.Spec=Spec
+    self.Brand=Brand
+    self.Num=Num
+    self.Unit=Unit
+    self.Price=Price
+    self.NetWeight=NetWeight
+
+Boxes={}
+
+for n in range(2, Nrows+1):
+  # dealing with sheet here
+  Tracking=str(`.fetch .from =sheet2+'/B'+str(n)`).strip()
+  if Tracking not in ProcessedTrackingNums:
+    ProcessedTrackingNums.append(Tracking)
+    Boxes[Tracking]=[]
+
+    # 1) list all items in a box to check if it is a box with special goods
+    BoxWeight=get_box_weight(Tracking, sheet1)
+    cprint('------------\n'+Tracking+'('+"{0:.2f}".format(BoxWeight)+' lb):')
+    Total=0
+    nOrder=1
+    for nrow in range(n, Nrows+1):
+      SubTracking=str(`.fetch .from =sheet2+'/B'+str(nrow)`).strip()
+      if SubTracking==Tracking:
+        BoxNum=str(`.fetch .from =sheet2+'/A'+str(nrow)`).strip()
+        ItemName=str(`.fetch .from =sheet2+'/C'+str(nrow)`).strip()
+        
+        Specification=str(`.fetch .from =sheet2+'/E'+str(nrow)`).strip()
+        Brand=str(`.fetch .from =sheet2+'/F'+str(nrow)`).strip()
+        
+        Num=str(`.fetch .from =sheet2+'/G'+str(nrow)`).strip()
+        Unit=str(`.fetch .from =sheet2+'/H'+str(nrow)`).strip()
+        Price=str(`.fetch .from =sheet2+'/I'+str(nrow)`).strip()
+        NetWeight=str(`.fetch .from =sheet2+'/J'+str(nrow)`).strip()
+        Boxes[Tracking].append(Item(BoxNum, ItemName, Specification, Brand, Num, Unit, Price, NetWeight, nrow))
+        Total+=int(Num)
+        
+        cprint(str(nOrder)+' item: '+ItemName)
+        cprint(str(nOrder)+' spec: '+Specification)
+        cprint(str(nOrder)+' brand: '+Brand)
+        cprint(str(nOrder)+' num: '+Num+' '+Unit)
+        
+        nOrder+=1
+        cprint('')
+    cprint('\nTotal items: '+str(Total))
+    IsSpecial=input('\nspecial? [Y/y=Yes]') 
+    if IsSpecial in ('y', 'Y') and Tracking not in SpecialGoodsTrackingNums: SpecialGoodsTrackingNums.append(Tracking)
+    
+    elif IsSpecial=='quit': return 
+
+    else:
+      
+    cprint('')
+cprint('spec:'+str(SpecialGoodsTrackingNums))
+cprint(ProcessedTrackingNums)
+      
+    
+    
+
+        
+
+  
+
+  
+# Item Name -> New Name ###
+'''
+if ItemName in DBItemNames: # Find item name in database, change the new item name directly
+  Idx=DBItemNames.index(ItemName)
+  NewName=DBNewNames[Idx]
+  if NewName: 
+    $. fetch =DBNewNames[Idx] .to =sheet2+'/C'+str(nrow) # write new name to Sheet2
+    cprint(Tracking+' >> Item name: '+ItemName+' -> '+NewName)        
+else: # not find item in database, input the new name
+  NewName=input() # if input y or Y or just enter, does not change item name or input the new item name
+  NewName=NewName.strip()
+  if NewName not in 'yY' and NewName:
+    $. fetch =NewName .to =sheet2+'/C'+str(nrow) # write new name to Sheet2
+    cprint(Tracking+' >> Item name: '+ItemName+' -> '+NewName)  
+  else: NewName=None
+  AppendToDB=[ItemName, None, None, NewName, None, None, None, None]
+'''
+#########################
+

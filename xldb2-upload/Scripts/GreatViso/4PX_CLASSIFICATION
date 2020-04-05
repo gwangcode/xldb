@@ -1,0 +1,15 @@
+import dlist
+L1=wb.read(args[1]+'/Sheet1/A')
+L2=wb.read(args[1]+'/Sheet2/A:B')
+L2=dlist.purge(L2)
+L2=dlist.transpose(L2)
+matched=False
+for i in L1:
+  matched=False
+  for j in L2:
+    if i.strip() in j[0]+str(j[1]): 
+      matched=True
+      cprint(j[0])
+      break
+  if not matched: cprint('')
+

@@ -1,0 +1,345 @@
+import files, os, filecmp, signal, shutil, time
+
+# Help information
+HelpInfo='''
+copy the directory to the destination directory,
+  while encountering the files with the same name, compare the files,
+  if they are identical, change the file name as the source file
+  if they are different, leave the file of the newer (last modified) and move the other to _history in the current directory
+  if they have the identical modified time, the file from the source and move the file at the destination to _history
+  The files that are moved to _history, will be changed the name to Original Name+Modifiled Time
+  if they all have _history directories, the _history directory will be merged, in which compare the files, and leave all different files,
+  while the file names are identical, add a sequential number on it. like abc_0, abc_1 ...
+
+archive ~/Documents /Volume/Backups -> arhive Documents to Backups
+                .exact -> exact but slow way to compare
+                .timeout 120 -> set up time limit for reading a file
+                .report abc -> export report to file abc
+                .hidden -> archive hidden files (.xxx, begins with .)
+'''
+# Variables
+la=len(args)
+NAnalyzed=0
+Exact=False
+report=''
+TimeLimit=120 # 120s
+BadSrc=[]
+BadDes=[]
+BadSrcCopy=[]
+BadDesRename=[]
+
+src=''
+des=''
+Hidden=False
+finfo=[]
+
+if la>1:
+  # Parameter Options
+  opts, free=wb.parameter_parse(args, nkey=['exact', 'hidden'], pkey=['timeout', 'report'])
+
+  if opts:
+    for i in opts:
+      if i[0]=='exact': Exact=True
+      if i[0]=='hidden': Hidden=True
+      elif i[0]=='report': report=i[1]
+      elif i[0]=='timeout': TimeLimit=int(i[1])
+      
+  lf=len(free)  
+  if lf>1: 
+    src=files.fpath(free[1])
+    des=files.fpath(free[2])
+  
+  else: err(HelpInfo)
+
+  # Main code
+
+  # time out set up
+  def time_limit(file): 
+    return TimeLimit+os.stat(file).st_size//100000000
+
+  def sig_except(signum, frame):
+    raise Exception('Timeout')
+
+  def size_in_proper_unit(Size, Is1024=False):
+    m=('k', 'M', 'G', 'T', 'P', 'Z', 'Y')
+    if Is1024: scale=1024
+    else: scale=1000
+    a=0
+    while a<len(m):
+      Size=Size/scale
+      if Size>=scale: a+=1
+      else: return str(int(Size*10)/10)+m[a]
+
+  def fcmp(f1, f2, TimeLimit, Exact=True):
+    '''
+    True: file identical
+    False: file not identical
+    None: fail to compare
+    '''
+    
+    try:
+      signal.alarm(TimeLimit)
+      r=filecmp.cmp(f1, f2, shallow=not Exact)
+      signal.alarm(0)
+      return r
+      
+    except: 
+      signal.alarm(0)
+      return None
+
+
+  def frename(filepath, mode='TIME'):
+    '''
+    TIME: Rename /abc/def/ghi.a -> /abc/def/ghi.ModifiedTime.a
+    BAD: Rename /abc/def/ghi.a -> /abc/def/ghi.n.bad.a
+    NEW: Rename /abc/def/ghi.a -> /abc/def/ghi.n.new.a
+    '''
+    
+    try:
+      signal.alarm(time_limit(filepath))
+      #mt=os.stat(filepath).st_mtime
+      fpath, filename=os.path.split(filepath)
+      file_extension=filename.split('.')[-1]
+      file_name='.'.join(filename.split('.')[:-1])
+      n=0
+      while True:
+        if mode=='TIME': 
+          if n: new_fpath=os.path.join(fpath, file_name+'.'+str(n)+'.old.'+file_extension)
+          else: new_fpath=os.path.join(fpath, file_name+'.old.'+file_extension)
+        elif mode=='BAD':
+          if n: new_fpath=os.path.join(fpath, file_name+'.'+str(n)+'.bad.'+file_extension)
+          else: new_fpath=os.path.join(fpath, file_name+'.bad.'+file_extension)
+        elif mode=='NEW':
+          if n: new_fpath=os.path.join(fpath, file_name+'.'+str(n)+'.new.'+file_extension)
+          else: new_fpath=os.path.join(fpath, file_name+'.new.'+file_extension)
+        
+        if os.path.exists(new_fpath): n+=1
+        else: 
+          os.rename(filepath, new_fpath)
+          break
+      signal.alarm(0)
+      return new_fpath
+    except: 
+      signal.alarm(0)
+      return None
+    
+
+  def fcopy(src, des): # copy file
+    
+    # check size of disk
+    desDir, desFile=os.path.split(des)
+    SrcSize=os.stat(src).st_size
+    try:
+      signal.alarm(time_limit(src)) 
+      total, used, AvailDiskSize=shutil.disk_usage(desDir)
+      signal.alarm(0)
+    except: 
+      signal.alarm(0)
+      return 'BadDisk' # error: BadDisk
+    
+    if AvailDiskSize<SrcSize: 
+      return 'NoEnoughSpace' # error NoEnoughSpace
+    else:
+      try: 
+        signal.alarm(time_limit(src)) 
+        shutil.copyfile(src, des)
+        signal.alarm(0)
+      except: 
+        signal.alarm(0)
+        return 'UnableToCopy' # error UnableToCopy
+
+  def fmove(src, des): # move file
+    signal.alarm(time_limit(src))
+    # check size of disk
+    desDir, defFile=os.path.split(des)
+    if os.stat(src).st_dev!=os.stat(desDir): # src & des on different drvies
+      SrcSize=os.stat(src).st_size
+      try: total, used, AvailDiskSize=shutil.disk_usage(f)
+      except: 
+        signal.alarm(0)
+        return 'BadDisk' # error: BadDisk
+    
+      if AvailDiskSize<SrcSize: 
+        signal.alarm(0)
+        return 'NotEnoughSpace' # error NotEnoughSpace
+      else:
+        try: shutil.move(src, des)
+        except: 
+          signal.alarm(0)
+          return 'UnableToCopy' # error UnableToCopy
+    else: # on the same disk
+      try: shutil.move(src, des)
+      except: 
+        signal.alarm(0)
+        return 'UnableToRename' # error UnableToRename
+
+  def file_readability(filepath):
+    '''
+    check readability of a file
+    '''
+    Sector=16777216
+    try:
+      signal.alarm(time_limit(filepath))
+      f=files.fopen(filepath, 'rb')
+      if os.stat(filepath).st_size<=Sector: 
+        try: f.read() 
+        except:
+          signal.alarm(0) 
+          return False
+      else:
+        x=''
+        while True:
+          signal.alarm(time_limit(filepath))
+          try: x=f.read(Sector)  
+          except:
+            signal.alarm(0) 
+            return False
+          if not len(x): break   
+      signal.alarm(0)
+      return True       
+    except: 
+      signal.alarm(0)
+      return False
+
+  def check_accessibility(Path):
+    r=None
+    try:
+      signal.alarm(time_limit(Path))
+      if not os.access(des, os.F_OK): r='NotFound'
+      if not os.access(des, os.R_OK): r='NoReadingAccess'
+      if not os.access(des, os.W_OK): r='NoWritingAccess'
+      signal.alarm(0)
+      return r
+    except:
+      signal.alarm(0) 
+      return 'BadFile'
+
+  # check des dir accessibility:
+  if not os.access(des, os.F_OK): err(des+' not found')
+  if not os.access(des, os.R_OK): err(des+' not permitted to read')
+  if not os.access(des, os.W_OK): err(des+' not permitted to write')
+
+  signal.signal(signal.SIGALRM, sig_except)
+  
+  TotalSourceSize=0
+  l=0
+  for subdir, dirs, fs in os.walk(src):
+    NAnalyzed+=1
+    for file in fs:
+      f=os.path.join(subdir, file)
+      
+      if not file.startswith('.') or Hidden: 
+        finfo.append(f) # file path to finfo
+        TotalSourceSize+=os.stat(f).st_size
+    
+    s='Analyzing dirs: '+str(NAnalyzed)
+    cprint('\r'+s ,end=' ', flush=True)
+    l=len(str(s))
+  
+  cprint('')
+  NTotal=len(finfo)
+  cprint('Total files: '+str(NTotal)+' ['+size_in_proper_unit(TotalSourceSize)+']', flush=True) # total number of files
+  
+  NProc=0
+  ls=0
+  for srcf in finfo:
+    signal.alarm(0)
+    #cprint('\r'+, flush=True)
+    if os.path.exists(srcf) and srcf not in BadSrc and srcf not in BadSrcCopy: # source file exists and good
+      # check permission
+      acc=check_accessibility(srcf)
+      if acc is not None:
+        if acc=='NotFound':
+          cprint('\r'+srcf+' not found', flush=True)
+          continue
+
+        elif acc=='NoReadingAccess':
+          BadSrc.append(srcf)
+          cprint('\r'+src+' not permitted to read', flush=True)
+          continue
+        
+        elif acc=='BadFile':
+          BadSrc.append(srcf)
+          cprint('\r'+'Bad source file: '+src, flush=True)
+          continue
+
+      
+      # check source file readability
+      if not fcmp(srcf, srcf, time_limit(srcf), Exact=Exact): # file unreadable
+        BadSrc.append(srcf)
+        cprint('\rBad Source file: '+srcf, flush=True)
+        continue
+
+      # source sub dir : /abc/def , source=/abc => /def
+      src_sub_path=srcf[len(src):] 
+      
+      # check destination dir exists or make it
+      subL=src_sub_path.split('/')
+      for n in range(2, len(subL)):
+        des_dir=os.path.join(des, os.path.join(*subL[:n]))
+        if not os.path.exists(des_dir): os.mkdir(des_dir)
+      
+      # check if file with the same name exists
+      desf=des+src_sub_path
+      if os.path.exists(desf): # destinaiton has the file with the same name
+        # compare srcf & desf
+        cr=fcmp(srcf, desf, time_limit(desf), Exact)
+       
+        if not cr: # src & des different but the same name or fail to compare
+          
+          NewName=frename(desf, mode='TIME')
+          if NewName is not None: # successful to rename
+            CopyStat=fcopy(srcf, desf)
+            if CopyStat=='BadDisk': err('Bad destination disk')
+            elif CopyStat=='NoEnoughSpace': err('No enough space on destination disk')
+            elif CopyStat=='UnableToCopy':
+              BadSrcCopy.append(srcf)
+              cprint('\rUnable to copy: '+srcf, flush=True)
+          
+          else: # fail to rename
+            BadDesRename.append(desf)
+            cprint('\rBad to rename: '+desf, flush=True)
+
+            fpath, filename=os.path.split(desf)
+            file_extension=filename.split('.')[-1]
+            file_name='.'.join(filename.split('.')[:-1])
+            n=0
+            while True:
+              if n: new_fpath=os.path.join(fpath, file_name+'.'+str(n)+'.new.'+file_extension)
+              else: new_fpath=os.path.join(fpath, file_name+'.new.'+file_extension)
+              if os.path.exists(new_fpath): n+=1
+              else:
+                desf=new_fpath
+                break
+            
+            CopyStat=fcopy(srcf, desf)
+            if CopyStat=='BadDisk': err('Bad destination disk')
+            elif CopyStat=='NoEnoughSpace': err('No enough space on destination disk')
+            elif CopyStat=='UnableToCopy':
+              BadSrcCopy.append(srcf)
+              cprint('\rUnable to copy: '+srcf, flush=True)
+
+      else: # no file with the same name
+        CopyStat=fcopy(srcf, desf)
+        if CopyStat=='BadDisk': err('Bad destination disk')
+        elif CopyStat=='NoEnoughSpace': err('No enough space on destination disk')
+        elif CopyStat=='UnableToCopy':
+          BadSrcCopy.append(srcf)
+          cprint('\rUnable to copy: '+srcf, flush=True)
+    
+    NProc+=1
+    cprint('\r'+' '*l, end=' ', flush=True)
+    s='Processed: '+str(NProc)+' ['+str(NProc*100//NTotal)+'%]'+' '+srcf[-16:]
+    ls=len(s)
+    #cprint('\r'+' '*ls, end='', flush=True)
+    cprint('\r'+s, end='', flush=True) # total number of files
+    
+  cprint('')
+  if report:
+    files.fwrite(report, ['Bad source files: ']+BadSrc+['Failed to copy source files: ']+BadSrcCopy+['Bad files in archive folders: ']+BadDes+['Failed to rename files in archive folders: ']+BadDesRename)
+    cprint('Report exported to '+report)
+
+else: cprint(HelpInfo)
+  
+  
+    

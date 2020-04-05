@@ -1,0 +1,51 @@
+import stdwb as wb, openpyxl as xl
+
+HelpInfo='''
+open FilePath .as WorkbookTag .formula .readonly -> List open workbooks
+if more than one workbook, WorkbookTags will be WorkbookTag, WorkbookTag1, ...
+'''
+la=len(args)
+DataOnly=True
+ReadOnly=False
+wbtag=''
+
+opts, free=wb.parameter_parse(args, nkey=['formula', 'readonly', 'help'], pkey=['as'])
+
+if opts:
+  for i in opts:
+    if i[0]=='formula': DataOnly=False
+    elif i[0]=='readonly': ReadOnly=True
+    elif i[0]=='help': err(HelpInfo)
+    else:
+      if i[0]=='as': wbtag=i[1]
+      else: err('No workbook tag')
+
+if len(free)==2: f1=free[1]
+else: 
+  f1=_RTN
+  if not f1: err('No file designated')
+p=wb.Glob_Parser(f1).Paths
+
+if f1:
+  if not wbtag: err('Please designate workbook tag')
+  if wbtag in wb.wblist(): err('Workbook tag already exists!')
+  else:
+    if p:
+      ntag=0
+      for i in p: 
+        try:
+          j=i.Full
+          wkbko=xl.load_workbook(j, data_only=DataOnly, read_only=ReadOnly)
+          if ntag==0: tag=wbtag
+          else: tag=wbtag+str(ntag)
+          cprint('Opened '+tag+' '+j)
+          wb.wbset[tag]=wb.wb(wkbko, j) # add wb to wbset
+          if ReadOnly: wb.wbset[tag].d=xl.Workbook(write_only=True)
+          ntag+=1
+        except:
+          cprint('Failed '+j)
+          continue
+      cprint('Opened '+str(ntag)+' file(s)')
+      return ntag
+    else: err('Path(s) not found!')
+    

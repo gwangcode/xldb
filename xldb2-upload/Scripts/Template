@@ -1,0 +1,29 @@
+import stdwb as wb
+
+# Help information
+HelpInfo='''
+
+'''
+# Variables & Functions
+la=len(args)
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help'], pkey=['???'])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    elif i[0]=='???': wbtag=i[1]
+    else: pass
+    
+
+if free: 
+  lf=len(free)
+  if lf==2: pass
+  else: err('Illegal parameters')
+else: err('Illegal parameters')
+
+# Main code
+# to do here ===
+  
+    

@@ -1,0 +1,5 @@
+LibDir=Libs
+ScriptDir=Scripts
+Imports=stdwb as wb, openpyxl as xl, multi
+EndCmd=EndCmd
+AutoComplete=AUTOCOMPLETE

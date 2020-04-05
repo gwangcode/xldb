@@ -1,0 +1,55 @@
+import stdwb as wb, openpyxl as xl, re
+
+HelpInfo='''
+lw /a/b/c -> List open workbooks/sheets/cols
+'''
+
+la=len(args)
+if la==1: a='*'
+elif la==2:
+  if args[1]=='.help':
+    cprint(HelpInfo)
+    return
+  else: a=args[1]
+
+  
+wkbk, sheet, cell=wb.split_wbname(a)
+if not wkbk: wkbk='*'
+wkbk=wb.name_wildcard(wkbk)
+r=[]
+if sheet is None: # *
+  if wb.wblist():
+    for i in wb.wblist():
+      if re.search(wkbk, i):
+        if wb.wbcls(i).is_writeonly(): cprint(str(i)+' (R): '+wb.wbp(i).strip())
+        else: cprint(str(i)+': '+wb.wbp(i).strip())
+        r.append(i)
+    
+else: # */* or */*/*
+  sheet=wb.name_wildcard(sheet)
+  if cell is None: # */*
+    for i in wb.wblist():
+      if re.search(wkbk, i):
+        shlist=wb.shlist(i)
+        if shlist:
+          for j in shlist:
+            if re.search(sheet, j):
+              s=str(i)+'/'+str(j)
+              cprint(s)
+              r.append(s)
+
+  else: # */*/*
+    cell=wb.name_wildcard(cell)
+    for i in wb.wblist():
+      if re.search(wkbk, i):
+        shlist=wb.shlist(i)
+        if shlist:
+          for j in shlist:
+            if re.search(sheet, j):
+              for k in wb.headerlist(i+'/'+j):
+                if k is None: k=''
+                if re.search(cell, str(k)):
+                  s=str(i)+'/'+str(j)+'/'+str(k)
+                  cprint(s)
+                  r.append(s) 
+return r

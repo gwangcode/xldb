@@ -1,0 +1,53 @@
+import stdwb as wb
+
+# Help information
+HelpInfo='''
+find duplicate record by column c to return the indices of the duplicates records
+idup w/s/c -> leave the last element out of the list
+     .back -> leave the first element out of the list (keep the first not to remove)
+     .full -> all the duplicate elements in the list
+'''
+# Variables & Functions
+la=len(args)
+Front=True
+Full=False
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help', 'back', 'full'])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    elif i[0]=='back': Front=False
+    elif i[0]=='full': Full=True
+    
+if free: 
+  lf=len(free)
+  if lf>=2: w, s, c=wb.split_wbname(free[1])
+  else: err('Illegal parameters')
+else: err('Illegal parameters')
+
+# Main code
+
+L=$. fetch =c .from =wb.compose(w,s) .where True .bycol
+
+r=[]
+if L:
+  L=L[0]
+  if L:
+    for value in set(L):
+      idxL=[i+2 for i, x in enumerate(L) if x == value]
+      if len(idxL)>1:
+        idxL.sort()
+        if Full: r+=idxL
+        elif Front: r+=idxL[:-1] # front
+        else: r+=idxL[1:] # back
+    # print out duplicate data
+    for i in r:
+      content=L[i-2]
+      cprint(str(i)+': '+str(content))
+    ######################
+
+return r
+  
+    

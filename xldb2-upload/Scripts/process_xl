@@ -1,0 +1,151 @@
+import stdwb as wb, dlist
+
+# Help information
+HelpInfo='''
+
+'''
+# Variables & Functions
+la=len(args)
+
+ProcessedTrackingNums=[]
+SpecialGoodsTrackingNums=[]
+
+
+
+class Item:
+  nOrder=0
+  Row=0
+ 
+  def __init__(self, nOrder=0, Row=0):
+    self.nOrder=nOrder
+    self.Row=Row
+
+Boxes={}
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help'], pkey=['db'])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    elif i[0]=='db': DBFile=i[1]
+    else: pass
+    
+
+if free: 
+  lf=len(free)
+  if lf==2: WorkFile=free[1]
+  else: pass
+else: err('Illegal parameters')
+
+# Main code
+$. close wkbk db 
+$. open =WorkFile .as wkbk 
+$. open =DBFile .as db 
+
+sheet2=wb.compose('wkbk', 'Sheet2')
+sheet1=wb.compose('wkbk', 'Sheet1')
+
+
+def get_box_weight(Tracking, sheet1=sheet1):
+  Nrows=$.shsize .row =sheet1;
+  r=$. fetch M .where str({B}).strip()==str(Tracking).strip() .from =sheet1;
+  return r[0][0]
+
+# DB
+NameDB=wb.compose('db', 'NameDB')
+ItemDB=wb.compose('db', 'ItemDB')
+
+Ncols=`.shsize .col .num =sheet2;`
+Nrows=`.shsize .row =sheet2;`
+
+for n in range(2, Nrows+1):
+  # dealing with sheet here
+  Tracking=str(`.fetch .from =sheet2+'/B'+str(n)`).strip()
+  if Tracking not in ProcessedTrackingNums:
+    ProcessedTrackingNums.append(Tracking)
+    Boxes[Tracking]=[]
+
+    # 1) list all items in a box to check if it is a box with special goods
+    BoxWeight=get_box_weight(Tracking, sheet1)
+    cprint('------------\n'+Tracking+'('+"{0:.2f}".format(BoxWeight)+' lb):')
+    Total=0
+    nOrder=1
+    for nrow in range(n, Nrows+1):
+      SubTracking=str(`.fetch .from =sheet2+'/B'+str(nrow)`).strip()
+      if SubTracking==Tracking:
+
+        # Grab data from sheet2
+        BoxNum=str(`.fetch .from =sheet2+'/A'+str(nrow)`).strip()
+        ItemName=str(`.fetch .from =sheet2+'/C'+str(nrow)`).strip()
+        
+        Specification=str(`.fetch .from =sheet2+'/E'+str(nrow)`).strip()
+        Brand=str(`.fetch .from =sheet2+'/F'+str(nrow)`).strip()
+        
+        Num=str(`.fetch .from =sheet2+'/G'+str(nrow)`).strip()
+        Unit=str(`.fetch .from =sheet2+'/H'+str(nrow)`).strip()
+        Price=str(`.fetch .from =sheet2+'/I'+str(nrow)`).strip()
+        NetWeight=str(`.fetch .from =sheet2+'/J'+str(nrow)`).strip()
+        Boxes[Tracking].append(Item(nOrder, nrow))
+        Total+=int(Num)
+
+        # Grab data from DB
+        # grab subnames
+        SubNames=$. fetch B .where str({A}).strip()==ItemName .from =NameDB
+        if dlist.is_dlist_alike(SubNames):
+          SubNames=SubNames[0][0].strip()
+          SubNameList=[i.strip() for i in SubNames.split(',')] # substitute name list
+        else: SubNames=''
+        ## resume here ##
+        # grab brands
+        ItemNames=[ItemName]
+        if SubNames: ItemNames=+SubNames
+        ForbiddenBrands=$. fetch B .bycol .where "str({A}).strip() in ItemNames" .from =ItemDB
+        ForbiddenBrands=[i.strip() for i in ','.join(ForbiddenBrands[0]).split(',')]
+        Brands=$. fetch C .bycol .where "str({A}).strip() in ItemNames" .from =ItemDB
+        Brands=ForbiddenBrands=[i.strip() for i in ','.join(Brands[0]).split(',')]
+         
+        if type(SubNames) in (tuple, list):
+          if len(SubNames)>=1:
+            if type(SubNames[0]) in (tuple, list):
+              SubNames=SubNames[0][0].strip()
+              SubNameList=[i.strip() for i in SubNames.split(',')] # substitute name list
+            else: SubNames=''
+          else: SubNames=''
+        else: SubNames=''
+        
+        # printouts
+        if SubNames: 
+          n=1
+          SubPrints=' -> '
+          for i in SubNameList: 
+            SubPrints+=str(n)+'. '+i+' '
+            n+=1
+          
+        else: SubPrints=''
+
+        cprint(str(nOrder)+' item: '+ItemName+SubPrints)
+        
+        ###############
+        cprint(str(nOrder)+' spec: '+Specification)
+        cprint(str(nOrder)+' brand: '+Brand)
+        cprint(str(nOrder)+' num: '+Num+' '+Unit)
+        
+        nOrder+=1
+        cprint('')
+    cprint('\nTotal items: '+str(Total))
+    IsSpecial=input('\nspecial? [Y/y=Yes]') 
+    if IsSpecial in ('y', 'Y') and Tracking not in SpecialGoodsTrackingNums: SpecialGoodsTrackingNums.append(Tracking)
+    
+    elif IsSpecial=='quit': return 
+
+    else: pass
+      ## go on here ##
+      
+    cprint('')
+cprint('spec:'+str(SpecialGoodsTrackingNums))
+cprint(ProcessedTrackingNums)
+
+$. close wkbk db 
+  
+    

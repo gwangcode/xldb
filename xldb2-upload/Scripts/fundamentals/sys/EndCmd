@@ -1,0 +1,10 @@
+import stdwb as wb, signal
+w=wb.active.split('/')
+if w:
+  if w[0]: 
+    FName=wb.File_Path_Parser(wb.wbp(w[0])).File 
+    if len(w)==1: prompt(w[0]+'['+FName+']')
+    else: prompt(w[0]+'['+FName+']'+'/'+w[1])
+  else: prompt('')
+
+signal.alarm(0)

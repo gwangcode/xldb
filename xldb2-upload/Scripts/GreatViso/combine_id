@@ -1,0 +1,103 @@
+import stdwb as wb, files, os, prompt_toolkit as pt
+from PIL import Image
+
+# Help information
+HelpInfo='''
+Combine ID pictures into one and try to obtain ID # as the file name
+Put ID pictures into the mobile disk ID folder
+combine_id
+'''
+# Variables & Functions
+la=len(args)
+Src=files.fpath('/Volumes/greatviso/ID')
+Dest=files.fpath('/Volumes/greatviso/IDs')
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help'], pkey=[])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    #elif i[0]=='???': wbtag=i[1]
+    #else: pass
+  
+# Main code
+def checkID(ID):
+  '''
+  Returns True if IDStr is correct, Otherwise returns False
+  '''
+  ChkCode=(7,9,10,5,8,4,2,1,6,3,7,9,10,5,8,4,2)
+  MatchCode={0:1, 1:0, 2:10, 3:9, 4:8, 5:7, 6:6, 7:5, 8:4, 9:3, 10:2}
+  s=0
+  
+  
+  if len(ID)==18: # check the decimals
+    # check ID is made of numbers and/or xX
+    for i in ID[:17]:
+      if i not in '0123456789': return False
+    if ID[17] not in '0123456789xX': return False
+    # check ID is code is correct
+    if ID[17] in ('X', 'x'): CheckCode=10
+    else: CheckCode=int(ID[17])
+    for Num, Code in zip(ID[:17], ChkCode): s+=int(Num)*Code
+    if CheckCode==MatchCode[s%11]: return True
+  return False
+
+def concat_v(im1, im2):
+    dst = Image.new('RGB', (max(im1.width, im2.width), im1.height + im2.height))
+    dst.paste(im1, (0, 0))
+    dst.paste(im2, (0, im1.height))
+    return dst
+
+while True:
+  Rotation=0
+  PicList=files.walk(Src+'/*')
+  
+  Input=pt.prompt('Press Enter to detect ID (Press quit to quit):')
+  
+  if Input=='quit': break
+
+  if PicList:
+    if len(PicList)>=1:
+      img1=Image.open(PicList[0])
+      img2=None
+    if len(PicList)==2:
+      img2=Image.open(PicList[1])
+      
+    for Rotation in (0,1,2,3):
+      img1=img1.rotate(90*Rotation)
+      ID=$. get_id_number =img1
+      if not ID and img2: 
+        img2=img2.rotate(90*Rotation)
+        ID=$. get_id_number =img2
+      
+      if ID: break
+    
+    if img2: img1=concat_v(img1, img2)
+    
+    if ID and checkID(ID):
+      
+      DestF=Dest+'/'+str(ID).strip()+'.jpg'
+      if os.path.isfile(DestF):
+        cprint('ID already exists')
+        os.system('mv '+DestF+' '+Dest+'/BackID/'+str(ID).strip()+'.jpg')
+      img1 = img1.save(DestF) 
+      
+    else:
+      Input=''
+      while not Input: Input=pt.prompt('Unable to detect ID, enter Name/ID:')
+      DestF=Dest+'/'+Input+'.jpg'
+      if os.path.isfile(DestF):
+        cprint('ID already exists')
+        os.system('mv '+DestF+' '+Dest+'/BackID/'+Input+'.jpg')
+      if Input: img1 = img1.save(DestF) 
+    
+    # adjust ID size
+    Cmd='convert '+DestF+' -define jpeg:extent=500kb '+DestF
+    os.system(Cmd)
+    
+    ## remove source file from ID
+    for f in files.walk(Src+'/*'): os.remove(f)
+
+      
+    

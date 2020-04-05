@@ -1,0 +1,45 @@
+import stdwb as wb, files, os 
+
+# Help information
+HelpInfo='''
+remove spaces of cells of all sheets in workbook
+remove_space [xlsx file]
+'''
+# Variables & Functions
+la=len(args)
+File=''
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help'])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    
+if free: 
+  lf=len(free)
+  if lf==2:  File=free[1]
+  else: err('Illegal parameters')
+else: err('Illegal parameters')
+
+# Main code
+File=files.fpath(File)
+$. close w1;
+if os.path.isfile(File): # File exists
+  $. open =File .as w1;
+  for sheet in `. lw w1/*;`:
+    Ncols=$. shsize .col .num =sheet;
+    #Nrows=$. shsize .row =sheet 
+    for i in range(1, Ncols):
+      Col=wb.num2col(i)
+      ColList=$. fetch .bycol .from =sheet+'/'+Col
+      ColList=ColList[0]
+      for icell in range(len(ColList)):
+        if type(ColList[icell]) is str: ColList[icell]=ColList[icell].strip()
+      ColList=[ColList]
+      $. fetch =ColList .bycol .to =sheet+'/'+Col
+  $. save w1;
+  $. close w1;
+
+else: err(File+' not exists')
+  
+    

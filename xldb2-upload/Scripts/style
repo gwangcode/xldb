@@ -1,0 +1,104 @@
+import stdwb as wb, commonstyle as cs, cellpath as cp 
+
+# Help information
+HelpInfo='''
+set up style of cells
+style .fname "Times New Roman" .fsize 12 ... a/Sheet1/B2
+
+.left, .right, .top, .bottom, .diagonal, .horizontal, .vertical -> designate borders
+.fname 'Times New Roman' -> font name
+.!fname -> clear fname
+.fbold, .fitalic, .fstrike, .foutline, .fshadow, .fcondense, .fextend, .funderline, . / .fbold  ... ! -> start bold
+.!fbold, etc. -> stop bold
+.@fbold, etc. -> print bold style
+.clear font, fill, protection, ...
+.!clear: clear all styles
+'''
+# Variables & Functions
+la=len(args)
+Side=None
+Cell=''
+ReadMark='@'
+#AHorizontal=AVertical=ARotation=AWrap=AShrink=AIndent=ARIndent=AJLast=AROrder=PLock=PHide=Format=FName=FColor=FScheme=FSize=FVAlign=BColor=BStyle=FBold=FItalic=FStrike=FOutline=FShadow=FCondense=FExtend=FUnderline=Side=DiagUp=DiagDown=BOutline=None
+
+# Parameter Options
+BoolItems=('fbold', 'fitalic', 'fstrike', 'foutline', 'fshadow', 'fcondense', 'fextend', 'diagup', 'diagdown', 'boutline', 'awrap', 'ashrink', 'ajlast','plock', 'phide')
+UnBoolItems=tuple(['!'+i for i in BoolItems])
+ReadBoolItems=tuple([ReadMark+i for i in BoolItems])
+StrItems=('fname',  'fsize', 'funderline', 'fvalign', 'fscheme', 'fcolor', 'bcolor', 'bgcolor', 'bstyle',  'ahorizontal', 'avertical', 'arotation', 'aindent', 'arindent',  'arorder', 'format', 'bfill', 'clear')
+UnStrItems=tuple(['!'+i for i in StrItems])
+ReadStrItems=tuple([ReadMark+i for i in StrItems])
+BorderDirect=('left', 'right', 'top', 'bottom', 'diagonal', 'horizontal', 'vertical')
+opts, free=wb.parameter_parse(args, nkey=('help',)+BorderDirect+BoolItems+UnBoolItems+UnStrItems+ReadBoolItems+ReadStrItems, pkey=StrItems)
+
+Paras={}
+for i in StrItems: Paras.update({i: None})
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    elif i[0] in ('left', 'right', 'top', 'bottom', 'diagonal', 'horizontal', 'vertical'): Side=i[1]
+    elif i[0] in StrItems: Paras[i[0]]=i[1]
+    elif i[0] in BoolItems: Paras[i[0]]=True
+    elif i[0] in UnBoolItems: Paras[i[0][1:]]=False
+    elif i[0] in UnStrItems: Paras[i[0][1:]]=''
+    elif i[0] in ReadStrItems+ReadBoolItems: Paras[i[0][1:]]=ReadMark
+
+if free: 
+  lf=len(free)
+  if lf==2: Cell=free[1]
+  else: err('Illegal parameters')
+else: err('Illegal parameters')
+
+# Main code
+_Cell=cp.locate(Cell)
+if not _Cell: err(Cell+' not exists')
+
+Cell=_Cell
+R={}
+w, s, col1, row1, col2, row2=cp.locate(Cell, Array=True)
+if not col2: col2=col1
+if not row2: row2=row1
+for icol in range(wb.col2num(col1),wb.col2num(col2)+1):
+  for irow in range(int(row1), int(row2)+1):
+    r={}
+    Cell=wb.compose(w, s, wb.num2col(icol)+str(irow))
+    for i in Paras.keys():
+      if i not in ('bcolor', 'bstyle')+BorderDirect:
+        if Paras[i]==ReadMark: 
+          printstyle={i:getattr(cs, i)(Cell)}
+          cprint(printstyle)
+          r.update(printstyle)
+        elif Paras[i] is not None: r.update({i:getattr(cs, i)(Cell, Paras[i])})
+
+    if Paras['bgcolor'] is not None: 
+      if Paras['bfill'] is not None: r.update({'bgcolor':cs.bgcolor(Cell, Paras['bgcolor'], Paras['bfill'])})
+      else: r.update({'bgcolor':cs.bgcolor(Cell, Paras['bgcolor'])})
+    elif Paras['bgcolor']==ReadMark: 
+      printstyle={'bgcolor':cs.bcolor(Cell)}
+      cprint(printstyle)
+      r.update(printstyle)
+      
+    for k in ('bstyle', 'bcolor'):
+      if Paras[k] is not None: 
+        for j in BorderDirect:
+          if Side==j: 
+            if Paras[k] is not None: r.update({Side[0]+k:getattr(cs,Side[0]+k)(Cell, Paras[k])})
+            elif Paras[k]==ReadMark:
+              printstyle={Side[0]+k:getattr(cs,Side[0]+k)(Cell)}
+              cprint(printstyle)
+              r.update(printstyle)
+    
+
+
+    R.update({wb.num2col(icol)+str(irow):r})
+
+return R
+
+
+
+
+
+
+  
+    

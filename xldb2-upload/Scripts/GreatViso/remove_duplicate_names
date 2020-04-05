@@ -1,0 +1,21 @@
+## move duplicate reeivers
+idx=$. idup a/Sheet1/F
+#Cond='{.idx.} in idx'
+TrackingList=$. fetch B .from a/Sheet1 .where "{.idx.} in idx" .bycol
+u=$.  move .from a/Sheet1 .to a/Sheet3 .where "{.idx.} in idx"
+
+$. idup a/Sheet1/F && move .from a/Sheet1 .to a/Sheet3 .where "{.idx.} in _RTN" # try this
+
+$. move .from a/Sheet2 .to a/Sheet4 .where "{B} in TrakcingList"
+
+#idx=$. fetch .index .from a/Sheet1 .where 
+$. move .from a/Sheet1 .to a/Sheet3 .where "{B} in TrakcingList"
+
+$. move .from a/Sheet2 .to a/Sheet4 .where "{B} in TrakcingList"
+
+
+## move missing ID receivers
+args[1]=xlFile
+MissingList=$. check_missing_id =xlFile
+Cond='{F} in '+str(MissingList)
+u=$. move .from a/Sheet1 .to a/Sheet3 .where =Cond

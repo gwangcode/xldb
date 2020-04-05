@@ -1,0 +1,74 @@
+import stdwb as wb, files, os, cellpath as cp, re
+from termcolor import colored
+
+# Help information
+HelpInfo='''
+gtsearch -> search expression (regular expression) in xlsx by text
+gtsearch .reg [regular expression 1] .reg [regular expression 2] ... .in [file 1] .file [file 2] ... -> search by regular expression from file 1, file 2 ...
+gtsearch [wildcard expression 1] [wildcard expression 2] ... .in [file 1] .in [file 2] ... -> search by wildcard expression (* ?) from file 1, file 2 ...
+Output:
+xlsx path/sheet(row): data row
+'''
+# Variables
+la=len(args)
+Files=[]
+fs=[]
+SearchStr=[]
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help'], pkey=['reg', 'in'])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    elif i[0]=='reg': SearchStr.append(str(i[1]))
+    if i[0]=='in': Files.append(i[1])
+
+lf=len(free)
+if lf>=2: SearchStr=[wb.name_wildcard(i) for i in free[1:]]
+#else: err('No file designated')
+
+# Main code
+for i in Files: fs+=files.walk(i)
+
+for i in fs:
+  ntag=$. open =i .as xl;
+  if ntag:
+    for sheet in `.lw /xl/*;`:
+      nRow=0
+      for row in `. fetch .from =sheet;`:
+        nRow+=1
+        s=''
+        PrintRow=False
+        for content in row:
+          if content is None: content=''
+          scont=str(content)
+          InsideRange=[]
+          for iSearchStr in SearchStr: InsideRange+=[i.span() for i in re.finditer(iSearchStr, scont)]
+          if InsideRange: 
+            PrintRow=True
+            AlreadyInside=False
+            #InsideRange=merge_range(IdxList, lstr)
+            for n in range(len(scont)):
+              for Range in InsideRange:
+                if Range[0]<=n<Range[1]: 
+                  s+=colored(scont[n], 'red')
+                  AlreadyInside=True
+                  break
+              if AlreadyInside: 
+                AlreadyInside=False
+                continue
+              else: s+=scont[n]
+            
+            s+=colored('|', 'blue')
+          else: s+=scont+colored('|', 'blue')
+        if PrintRow:
+          sh=wb.split_wbname(sheet)[1]
+          wkbk=$. repath xl;
+          cprint(colored(wkbk+'/'+sh+'('+str(nRow)+')'+': ', 'blue')+s, flush=True) 
+          PrintRow=False
+
+  $. close xl;
+
+  
+    

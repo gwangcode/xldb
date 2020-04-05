@@ -1,0 +1,37 @@
+import stdwb as wb, files, os
+
+# Help information
+HelpInfo='''
+rename_tracking_pdf Tracking.xlsx Dir
+  Tracking.xlsx -> Tracking number list: Tracking B Zhongtong
+  Dir -> China tracking pdf dir
+  Change china tracking pdf to tracking pdf (73126676718278.pdf -> 30238538.pdf)
+'''
+# Variables
+la=len(args)
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help'])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    
+
+if free:
+  TrackingFile=free[1]
+  Dir=free[2]
+else: err('No file designated')
+
+# Main code
+$. open =TrackingFile .as Trackingf
+for i in `. fetch .from Trackingf/Sheet1/A:C` :
+  Tracking=str(i[0]).strip()
+  ChinaTracking=str(i[2]).strip()
+  if files.exists(Dir+'/'+ChinaTracking+'.pdf'):
+    src=files.fpath(Dir+'/'+ChinaTracking+'.pdf')
+    des=files.fpath(Dir+'/'+Tracking+'.pdf')
+    os.rename(src, des)
+$. close Trackingf
+  
+    

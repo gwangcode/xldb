@@ -1,0 +1,75 @@
+import stdwb as wb, files, cellpath as cp 
+
+# Help information
+HelpInfo='''
+rename the open workbook tag:
+rename worktag newtag
+rename the sheet to new sheet:
+rename /w/sheet1 /w/sheet2
+rename the col name to new col:
+rename /w/sheet1/OldName /w/sheet1/NewName
+'''
+# Variables
+la=len(args)
+WorkTag=''
+NewTag=''
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help'])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    
+if free:
+  lf=len(free)
+  if lf>=3: 
+    w1, s1, c1=wb.split_wbname(free[1])
+    w2, s2, c2=wb.split_wbname(free[2])
+  else: err('Wrong designations')
+    
+else: err('Wrong designations')
+
+# Main code
+# change worktag
+if w1!=w2:
+  if w1 in wb.wblist():
+    if wb.legal_name(w2):
+      if w2 in wb.wblist(): err('New tag already exists')
+      else:
+        wb.wbset[w2]=wb.wbset.pop(w1)
+        cprint('Workbook ('+w1+') changed to '+w2)
+        return w2
+    else: err('Illegal new tag')
+
+  else: cprint(WorkTag+' not found')
+
+else: # change sheet
+  if w1 in wb.wblist():
+    if s1!=s2:
+      if s1 in wb.shlist(w1):
+        if wb.legal_name(s2):
+          if s2 in wb.shlist(wb.compose(w1, s1)): err('New sheet name already exists')
+          else:
+            wb.shto(wb.compose(w1, s1)).title=s2
+            cprint('Sheet ('+s1+') changed to '+s2)
+            return s2
+        else: err('Illegal new sheet name')
+      else: err(s1+' not exists')
+    
+    else: # change col name
+      lc1=cp.locate(wb.compose(w1, s1, c1))
+      if lc1:
+        NewColName=cp.col_name(wb.compose(w2, s2, c2))
+        if NewColName==None: NewColName=''
+        if wb.legal_name(NewColName): 
+          OldName=cp.col_name(lc1)
+          wb.write(lc1+'1', NewColName)
+          cprint(lc1+' ('+OldName+') changed to new name: '+NewColName)
+        else: err('Illegal column name')
+        
+      else: err('Unable to locate '+wb.compose(w1, s1, c1))
+
+  else: cprint(WorkTag+' not found')
+  
+    

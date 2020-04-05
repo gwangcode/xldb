@@ -1,0 +1,56 @@
+import stdwb as wb, files, os, termcolor as tc
+
+# Help information
+HelpInfo='''
+lcmd -> show all commands
+'''
+# Variables & Functions
+la=len(args)
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help'], pkey=[])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)  
+
+# Main code
+Cmds={}
+SDir=scriptdir()
+lsdir=len(SDir)
+cprint(tc.colored(SDir+':', 'blue', attrs=['bold']))
+for i in files.walk(SDir+'/**/*'):
+  if not os.path.isdir(i): 
+    i=i[lsdir:]
+    iList=i.split('/', 2)
+    #cprint(iList)
+    lList=len(iList)
+    if lList==2:
+      if 0 in Cmds.keys(): Cmds[0].append(iList[1])
+      else: Cmds[0]=[iList[1]]
+    elif lList>2:
+      if iList[1] in Cmds.keys(): Cmds[iList[1]].append(iList[2])
+      else: Cmds[iList[1]]=[iList[2]]
+#Cmds.sort()
+Keys=list(Cmds.keys())
+Keys.pop(0)
+Keys.sort()
+CmdList=Cmds[0]
+CmdList.sort()
+for i in CmdList: cprint('  '+tc.colored(i, attrs=['bold']), flush=True, end=' ')
+cprint('')
+for i in Keys:
+  #cprint(Cmds[i])
+  cprint(tc.colored(i+':', 'blue')) 
+  CmdList=Cmds[i]
+  CmdList.sort()
+  for j in CmdList: 
+    CList=j.split('/')
+    Cmd=CList[-1]
+    CmdPath='/'.join(CList[:-1])
+    if CmdPath: cprint(tc.colored('  '+CmdPath+'/', 'green')+tc.colored(Cmd, attrs=['bold']), flush=True, end='')
+    else: cprint(tc.colored('  '+Cmd, attrs=['bold']), flush=True, end='')
+  cprint('')
+return Cmds
+
+  
+    

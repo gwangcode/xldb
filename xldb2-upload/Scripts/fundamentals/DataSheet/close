@@ -1,0 +1,21 @@
+import stdwb as wb, openpyxl as xl, re
+
+HelpInfo='''
+close WorkbookTag -> Close open workbooks
+'''
+la=len(args)
+
+if la==1: tag=_RTN
+elif la>1: tags=args[1:]
+if tags:
+  for tag in tags:
+    p=wb.name_wildcard(tag)
+    r=[]
+    for i in wb.wbset:
+      if re.match(p, i): r.append(i)
+    for i in r:
+      if i==wb.split_wbname('')[0]: cprint(i+' is in use, unable to close')
+      else: 
+        del wb.wbset[i]
+        cprint('Closed '+i)
+else: cprint(HelpInfo)

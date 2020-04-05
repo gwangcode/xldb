@@ -1,0 +1,63 @@
+import stdwb as wb, os
+
+# Help information
+HelpInfo='''
+read or set shell environment variable
+shellvar a -> read shell environment variable a
+shellvar a 5 -> set shell environment variable a as 5
+shellvar .list -> list shell environments
+         .remove a -> remove shell environment a
+'''
+# Variables & Functions
+la=len(args)
+ListVars=False
+ReadVar=False
+Value=None
+Var=None
+Remove=False
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help', 'list', 'remove'], pkey=[])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    elif i[0]=='list': ListVars=True
+    elif i[0]=='remove': Remove=True
+    else: pass
+    
+
+if free: 
+  lf=len(free)
+  if lf==2: 
+    if not Remove: ReadVar=True 
+    Var=str(free[1]).strip()
+
+  elif lf==3:
+    ReadVar=False
+    Var=str(free[1]).strip()
+    Value=str(free[2]).strip()
+  
+  elif lf>3: err('Illegal parameters')
+else: err('Illegal parameters')
+
+# Main code
+if ListVars:
+  for i in os.environ: cprint(i+': '+os.environ[i])
+  return os.environ
+elif Remove:
+  if Var in os.environ:
+    cprint(os.environ[Var])
+    del os.environ[Var]
+    return
+
+
+if ReadVar: # read environment variable
+  if Var in os.environ:
+    cprint(os.environ[Var])
+    return os.environ[Var]
+else: # set environment variable
+  os.environ[Var]=Value
+  cprint(os.environ[Var])
+  return os.environ[Var]
+    

@@ -1,0 +1,268 @@
+import stdwb as wb, files, os
+
+# Help information
+HelpInfo='''
+check_address [xlsx file] .db [province-city-district workbook] 
+              .complete -> complete the provinces & cities e.g. 北京 -> 北京市
+              .dist -> add district info to col Q
+'''
+# Variables & Functions
+la=len(args)
+wkbk=''
+File=''
+Complete=False
+AddDist=False
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help', 'complete', 'dist'], pkey=['db'])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    elif i[0]=='db': wkbk=i[1]
+    elif i[0]=='complete': Complete=True
+    elif i[0]=='dist': AddDist=True
+    
+
+if free: 
+  lf=len(free)
+  if lf==2: File=free[1]
+  else: err('Illegal parameters')
+else: err('Illegal parameters')
+
+# Main code
+# Cities of a province
+def cities(Province, Povinces, db):
+  '''
+  Cities of a province
+  cities('河南', Provinces, db)
+  Provinces -> Provinces list
+  db -> db from database
+  returns Cities dict of a pronvice
+  Cities={'郑州': 1 , ...}
+  '''
+  Cities={}
+  if Province[-1]=='市': Cities[Province]=Provinces[Province]
+  else:
+    for row in db:
+      #cprint(str(row)+' '+str(Province))
+      if row[1]==Provinces[Province] and not row[3] and row[2]: 
+        Cities[row[0].strip()]=row[2]
+  return Cities
+
+def districts(City, Province, Cities, Provinces, db):
+  '''
+  district dict of a City in a Province
+  districts('郑州', '河南', Cities, Provinces, db)
+  returns Districts={'中原区': 2, ...}
+  '''
+  Districts={}
+  if Province[-1]=='市': 
+    for row in db:
+      if row[1]==Provinces[Province] and row[3] and row[2]: 
+        Districts[row[0].strip()]=row[3]
+  else:
+    for row in db:
+      if Provinces[Province]==row[1] and Cities[City]==row[2] and row[3]: Districts[row[0].strip()]=row[3]
+  return Districts
+        
+def match(Region, List):
+  '''
+  match region in List, 
+  if Region is matched, return the matched item in List
+  else returns None
+  e.g. match('郑州', Cities) -> 郑州市
+  '''
+  Match=[]
+  for i in List.keys():
+    #cprint(i[:3]+' '+Region[:3])
+    if Region[:2] == i[:2]: Match.append(i)
+  
+  n=2
+  while True:
+    tMatch=[]
+    n+=1
+    if len(Match)>1: 
+      for i in Match:
+        if Region[:n]==i[:n]: tMatch.append(i)
+      Match=tMatch
+    else: return Match
+
+def min_chars(Region, List):
+  '''
+  Find minimum characters for a city
+  e.g. 郑州 -> 郑州, 郑州市 -> 郑州
+  '''
+  Match=[]
+  for i in List.keys():
+    #cprint(i[:3]+' '+Region[:3])
+    if Region[:2] == i[:2]: Match.append(i)
+  
+  n=2
+  while True:
+    tMatch=[]
+    n+=1
+    if len(Match)>1: 
+      for i in Match:
+        if Region[:n]==i[:n]: tMatch.append(i)
+      Match=tMatch
+    else: return Region[:n-1]
+
+
+def match_right(Region, List):
+  '''
+  match region in List from the right of a string, 
+  if Region is matched, return the matched item in List
+  else returns None
+  e.g. match('郑州', Cities) -> 郑州市
+  '''
+  Match=[]
+  for i in List.keys():
+    #cprint(i[:3]+' '+Region[:3])
+    if Region[-3:] == i[-3:]: Match.append(i)
+  
+  n=3
+  while True:
+    tMatch=[]
+    n+=1
+    if len(Match)>1: 
+      for i in Match:
+        if Region[-n:]==i[-n:]: tMatch.append(i)
+      Match=tMatch
+    else: return Match
+    
+
+File=files.fpath(File)
+#AddrList=[]
+$. close w1;
+if os.path.isfile(File): $. open =File .as w1;
+
+else: err(File+' not exist')
+
+if 'w1' in `.lw *;`:
+  #$. close province_db;
+  #$. open =File .as province_db;
+  db=$. fetch .from =wkbk+'/Sheet1/B:E'
+  db=db[1:]
+  Provinces={}
+  #Cities={}
+  #Cities
+  for i in db:
+    if not i[2]: Provinces[i[0].strip()]=i[1]
+
+  if 'w1' in `.lw *;`: 
+    for i in range(2, `.shsize .row w1/Sheet1;`+1):
+      Addr=$. fetch .from ='w1/Sheet1/H'+str(i)+':J'+str(i)
+      Province, City, Address=Addr[0]
+      # remove address illegal chars
+      Address=Address.replace(' ', '')
+      Address=Address.replace(',', '')
+      Address=Address.replace('，', '')
+      Address=Address.replace('。', '')
+
+      ##############################
+      CProvince=match(Province, Provinces)      
+      if CProvince:
+        CProvince=CProvince[0]
+        if Complete: Province=CProvince
+        Cities=cities(CProvince, Provinces, db)
+        CCity=match(City, Cities)
+        
+        if CCity:
+          CCity=CCity[0]
+          if Complete: City=CCity
+          # obtain 区
+          # RIGHT(LEFT(H3,FIND("区",H3)),3)
+          if AddDist:
+            Districts=districts(CCity, CProvince, Cities, Provinces, db)
+            try: 
+              DistIdx=Address.index('区')
+              Dist=Address[DistIdx-2:DistIdx+1]
+              CDist=match_right(Dist, Districts)
+              CDist=CDist[0]
+            except: CDist=''
+            
+            if CDist: $. fetch =CDist .to ='w1/Sheet1/Q'+str(i)
+            else:
+              if Districts: 
+                DList=list(Districts.keys())
+                cprint(str(i)+' '+str(DList[0]))
+                $. fetch =DList[0] .to ='w1/Sheet1/Q'+str(i) # write district to Q
+              else: cprint(str(i)+' '+str(Districts))
+          
+          # check address
+          # =if(exact(left(h2,2),left(j2,2)),"",if(exact(left(i2,2),left(j2,2)),h2&j2,h2&i2&j2))
+          if Address[:2]==CProvince[:2]: # match province
+            minCity=min_chars(CCity, Cities)
+            if CProvince[-1]=='市':
+              if minCity not in Address[:2+len(CProvince)]: # province matched but city not matched
+                PreAddress=Address
+                Address=Province+Address
+                ContentO=$. fetch .from ='w1/Sheet1/O'+str(i)
+                if ContentO is None: ContentO=''
+                else: ContentO=str(ContentO).strip()
+                $. fetch "=[ContentO+' <-Corrected: added province to Address']" .to ='w1/Sheet1/O'+str(i)
+                cprint(str(i)+': '+Province+'|'+City+'|'+PreAddress+' -> '+Address+' => Corrected: added province to Address')
+
+            else:
+              if minCity not in Address[2:2+len(CProvince)+len(CCity)]: # province matched but city not matched
+                PreAddress=Address
+                Address=Province+City+Address
+                ContentO=$. fetch .from ='w1/Sheet1/O'+str(i)
+                if ContentO is None: ContentO=''
+                else: ContentO=str(ContentO).strip()
+                $. fetch "=[ContentO+' <-Corrected: added province and city to Address']" .to ='w1/Sheet1/O'+str(i)
+                cprint(str(i)+': '+Province+'|'+City+'|'+PreAddress+' -> '+Address+' => Corrected: added province to Address')
+
+          else: # no province found 
+            minCity=min_chars(CCity, Cities)
+            if minCity in Address[:len(CCity)]: # no province matched but city matched
+              PreAddress=Address
+              Address=Province+Address
+              ContentO=$. fetch .from ='w1/Sheet1/O'+str(i)
+              if ContentO is None: ContentO=''
+              else: ContentO=str(ContentO).strip()
+              $. fetch "=[ContentO+' <-Corrected: added province to Address']" .to ='w1/Sheet1/O'+str(i)
+              cprint(str(i)+': '+Province+'|'+City+'|'+PreAddress+' -> '+Address+' => Corrected: added province to Address')
+            
+            else: # no province and no city matched
+              PreAddress=Address
+              Address=Province+City+Address
+              ContentO=$. fetch .from ='w1/Sheet1/O'+str(i)
+              if ContentO is None: ContentO=''
+              else: ContentO=str(ContentO).strip()
+              $. fetch "=[ContentO+' <-Corrected: added province and city to Address']" .to ='w1/Sheet1/O'+str(i)
+              cprint(str(i)+': '+Province+'|'+City+'|'+PreAddress+' -> '+Address+' => Corrected: added province and city to Address')
+        
+        else: # city in city not found and try to guess the city is the district to infer the city
+          PossibleCities=[]
+          Cities=cities(CProvince, Provinces, db)
+          for iCity in Cities:
+            Districts=districts(iCity, CProvince, Cities, Provinces, db)
+            if match(City, Districts): PossibleCities.append(iCity)
+          if len(PossibleCities)==1: 
+            City=PossibleCities[0]
+            PreAddress=Address
+            Address=Province+City+Address
+            ContentO=$. fetch .from ='w1/Sheet1/O'+str(i)
+            if ContentO is None: ContentO=''
+            else: ContentO=str(ContentO).strip()
+            $. fetch "=[ContentO+' <-Corrected: added city to Address']" .to ='w1/Sheet1/O'+str(i)
+            cprint(str(i)+': '+Province+'|'+City+'|'+PreAddress+' -> '+Address+' => Corrected: added city to Address')
+          else:
+            ContentO=$. fetch .from ='w1/Sheet1/O'+str(i)
+            if ContentO is None: ContentO=''
+            else: ContentO=str(ContentO).strip()
+            $. fetch "=[ContentO+' <-Wrong City in City', 'r']" .to ='w1/Sheet1/O'+str(i)
+            cprint(str(i)+': '+Province+'|'+City+'|'+Address+' => Wrong Province in Province')
+      
+      $. fetch =[Province,City,Address] .to ='w1/Sheet1/H'+str(i)
+    
+    $. save w1;
+
+  else: err('Fail to open '+File)
+  
+  $. close w1;
+
+else: err(File+' not open correctly')
+  
+    

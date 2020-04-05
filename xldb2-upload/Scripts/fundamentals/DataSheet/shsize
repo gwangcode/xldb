@@ -1,0 +1,45 @@
+import stdwb as wb
+
+# Help information
+HelpInfo='''
+shsize -> show/return total sheet cols/rows
+shsize .col w/s -> return sheet cols in A, B, C ...
+shsize .col .num w/s -> return sheet cols in 1, 2, 3 ...
+shsize .row w/s -> return sheet rows 1, 2, 3 ...
+return None on error
+'''
+# Variables
+la=len(args)
+NumCol=False
+Col=False
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['num', 'row', 'col', 'help'])
+
+if opts:
+  for i in opts:
+    if i[0]=='num': NumCol=True
+    elif i[0]=='row': Col=False
+    elif i[0]=='col': Col=True
+    elif i[0]=='help': err(HelpInfo)
+
+if len(free)==2: w, s=wb.split_wbname(free[1])[:2]
+else: err('No sheet designated')
+
+# Main code
+if w and s:
+  if w in wb.wblist():
+    if s in wb.shlist(w):
+      if Col: # col size
+        MCol=wb.maxcol(wb.compose(w, s))
+        if not NumCol: MCol=wb.num2col(MCol)
+        cprint(str(MCol))
+        return MCol
+      else: # row size
+        MRow=wb.maxrow(wb.compose(w, s))
+        cprint(str(MRow))
+        return MRow
+    else: cprint('Sheet ('+s+') does not exist') 
+  else: cprint('Workbook ('+w+') does not exist')
+  
+    

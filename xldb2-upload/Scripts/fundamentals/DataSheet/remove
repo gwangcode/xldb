@@ -1,0 +1,136 @@
+import stdwb as wb, re, dlist, datatype, cellpath as cp
+
+# Help information
+HelpInfo=''' 
+remove -> remove columns or rows
+remove 1 .from /w/s/A -> remove 1 col at A 
+remove .from /w/s/A:C  remove cols from A to C -> remove Cols A, B, C from A
+remove =[Col name list] .from /w/s  -> remove cols by name from w/s * such as Student. Gender.
+remove 10 .from /w/s/5  -> remove 10 rows at row 5
+remove .from /w/s/5:10 -> remove rows from 5 to 10 
+remove =[Row list] .from /w/s  -> remove rows by list from w/s
+remove w/s -> remove sheet
+'''
+# Variables
+#la=len(args)
+#N=1
+Pos=None
+Removal='1'
+Help=False
+
+# Funcitons
+def is_int(Data): return type(Data) is int
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, pkey=['from'], nkey=['help'])
+
+if opts:
+  for i in opts:
+    if i[0]=='from': Pos=i[1]
+    elif i[0]=='help': Help=True
+
+if len(free)==2: Removal=free[1]
+elif len(free)>2: Removal=free[1:]
+elif _RTN: Removal=_RTN
+# Removal is a list
+
+# Main code
+if Help: err(HelpInfo)
+
+# Pos
+if Pos:
+  w, s, c=wb.split_wbname(Pos)
+  c=datatype.num(c)
+  if type(c) is int: # remove row
+    if c<=0: err('Removing start row should be positive')
+
+# Removal
+if Removal:
+  if type(Removal)not in (list, tuple): # n rows/cols
+    Removal=datatype.num(Removal)
+    if type(Removal) is int: # remove n cols/rows
+      if Removal<0: err('Number of Removals should be positive')
+      else: 
+        if type(c) is int: # Remove rows
+          MaxRow=wb.maxrow(wb.compose(w, s))
+          if c<=MaxRow: # .from /w/s/c is within the rows
+            Removal=min(MaxRow-c+1, Removal)
+            if Removal>0:
+              wb.remove(wb.compose(w, s, str(c)), row=Removal)
+              cprint('Removed '+str(Removal)+' rows')
+            else: cprint('Removed 0 rows')
+          else: cprint(Pos+' over the max row ('+MaxRow+')')
+
+        else: # remove cols
+          MaxCol=wb.maxcol(wb.compose(w, s))
+          Removal=min(MaxCol-wb.col2num(c)+1, Removal) 
+          if Removal>0:
+            wb.remove(wb.compose(w, s, c), col=Removal)
+            cprint('Removed '+str(Removal)+' cols')
+          else: cprint('Removed 0 rows')
+
+    elif type(Removal) is str: # remove sheet
+      w, s, c=wb.split_wbname(Removal)
+      if w in wb.wblist():
+        if s in wb.shlist(w): 
+          wb.remove_sheet(Removal)
+          cprint('Removed Sheet: '+Removal)
+        else: err('Sheet ('+str(s)+') does not exist')
+      else: err('Workbook ('+str(w)+') does not exist')
+
+  else: # =[...]
+    if all(map(is_int, Removal)):
+      #AlreadyRemoved=0
+      Removal.sort(reverse=True)
+      for i in Removal:
+        MaxRow=wb.maxrow(wb.compose(w, s))
+        if i<=MaxRow: # .from /w/s/c is within the rows
+          Rm=min(MaxRow, i)
+          if Rm>=1:
+            wb.remove(wb.compose(w, s, str(Rm)), row=1)
+            cprint('Removed row '+str(Rm))
+          else: cprint('Unable to remove row ('+Rm+')')
+        else: cprint(str(Pos)+' over the max row ('+str(MaxRow)+')')
+    else:
+      _get_col=lambda x: cp.col(wb.compose(w, s, x))
+      ColList=list(map(_get_col, Removal))
+      L=list(map(wb.col2num, ColList))
+      L.sort(reverse=True)
+      
+      for i in L:
+        if i:
+          cn, c=wb.cellname(wb.compose(w, s, wb.num2col(i)))[:2]
+          if c:
+            wb.remove(wb.compose(w, s, c), col=1)
+            if cn is None: cn=''
+            cprint('Removed col '+cn+'.'+c)
+          else: cprint('Column ('+i+') not exists')
+
+else: 
+  if Pos: # remove .from /w/s/c or remove .from /w/s/5:10
+    Arr=cp.complete_path(Pos, Array=True)
+    w, s=Arr[:2]
+    BeginName, BeginCol, BeginRow=Arr[2:5]
+    EndName, EndCol, EndRow=Arr[5:8]
+    if BeginCol and EndCol: # remove cols
+      BeginCol=min(wb.col2num(BeginCol), wb.maxcol(wb.compose(w, s)))
+      EndCol=min(wb.col2num(EndCol), wb.maxcol(wb.compose(w, s)))
+      N=int(EndCol)-int(BeginCol)+1
+      BeginCol=wb.num2col(BeginCol)
+      EndCol=wb.num2col(EndCol)
+      wb.remove(wb.compose(w, s, BeginCol+'1'), col=N)
+      cprint('Removed '+BeginName+'.'+BeginCol+':'+EndName+'.'+EndCol+' '+str(N)+' col(s)')
+
+    elif BeginRow and EndRow: # remove rows
+      BeginRow=min(int(BeginRow), wb.maxrow(wb.compose(w, s)))
+      EndRow=min(int(EndRow), wb.maxrow(wb.compose(w, s)))
+      N=int(EndRow)-int(BeginRow)+1
+      wb.remove(wb.compose(w, s, 'A'+str(BeginRow)), row=N)
+      cprint('Removed '+str(BeginRow)+':'+str(EndRow)+' '+str(N)+' row(s)')
+    
+    else: cprint('Illegal arguments!')
+    
+  else: cprint('Illegal arguments!')
+
+
+    

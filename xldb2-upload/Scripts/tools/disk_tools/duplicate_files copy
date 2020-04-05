@@ -1,0 +1,240 @@
+import files, os, filecmp, signal
+
+# Help information
+HelpInfo='''
+Check and/or remove all duplicate files in a directory and its subdirectories and export the duplicate files/dirs to export file
+duplicate_files ~/Documents ~/DuplicateList -> keep empty directory
+duplicate_files .rmdir ~/Documents ~/Documents/DuplicateList -> remove empty directory
+                .exact -> exact but slow way to compare
+                .for_remove -> only write duplicate files
+                .remove -> delete the duplicate files
+                .timeout 120 -> set up time limit for reading a file
+
+*** it doesn't check the hidden files (.xxx, begins with .)
+'''
+# Variables
+la=len(args)
+Rmdir=False
+Exact=False
+ForRemove=False
+RemoveFile=False
+DuplicateList=[]
+EmptyDirList=[]
+exportdir=''
+TimeLimit=120 # 120s
+BadFile=False
+BadfileList=[]
+
+if la>1:
+  # Parameter Options
+  opts, free=wb.parameter_parse(args, nkey=['rmdir', 'exact', 'for_remove', 'remove'], pkey=['timeout'])
+
+  if opts:
+    for i in opts:
+      if i[0]=='rmdir': Rmdir=True
+      elif i[0]=='exact': Exact=True
+      elif i[0]=='for_remove': ForRemove=True
+      elif i[0]=='remove': RemoveFile=True
+      elif i[0]=='timeout': TimeLimit=int(i[1])
+      
+  lf=len(free)  
+  if lf>1: 
+    rootdir = files.fpath(free[1])
+    if lf>2: exportdir=free[2]
+  
+  else: err(HelpInfo)
+
+  # Main code
+
+  # time out set up
+  def sig_except(signum, frame):
+    raise Exception('Timeout')
+
+  signal.signal(signal.SIGALRM, sig_except)
+
+  def sortFirst(val): 
+      return val[0:3]  
+
+  finfo=[]
+  NAnalyzed=0
+  l=0
+  for subdir, dirs, fs in os.walk(rootdir):
+    NAnalyzed+=1
+    for file in fs:
+      f=os.path.join(subdir, file)
+      fl=f.split('/')
+      if not file.startswith('.'): finfo.append([os.stat(f).st_size, len(fl), len(fl[-1]), f]) # [file_size, dir_depth, file_name_length  file_path]
+    cprint('\r'+' '*l, end=' ', flush=True)
+    s='Analyzing dirs: '+str(NAnalyzed)
+    cprint('\r'+s ,end=' ', flush=True)
+    l=len(str(s))
+  
+  cprint('')
+  NTotal=len(finfo)
+  cprint('Total files: '+str(NTotal), flush=True) # total number of files
+
+  finfo.sort(key = sortFirst) # list of all sub files sorted by size
+
+  sizes = set(map(lambda x:x[0], finfo))
+  
+  group_dict={}
+
+  for x in sizes:  group_dict[x]=[]
+  
+  NGrouping=0
+  grouped=[]
+  l=0
+  for y in finfo:
+    for x in group_dict.keys():
+      if y[0]==x: 
+        NGrouping+=1
+        group_dict[x].append([y[3], False]) # [path, if_remove]
+        cprint('\r'+' '*l, end=' ', flush=True)
+        s='Analyzing files: '+str(NGrouping)+' ['+str(NGrouping*100//NTotal)+'%]'
+        cprint('\r'+s ,end=' ', flush=True)
+        l=len(str(s))
+
+  cprint('')
+    
+
+  for i in group_dict.keys(): grouped.append(group_dict[i])
+  #x=max(tuple(map(len, grouped)))
+  #cprint(x)
+  # grouped = [[y[1] for y in finfo if y[0]==x] for x in sizes]
+  
+  NProcessed=0
+  NRemoved=0
+  l=0
+  for grouped_files in grouped:
+    lg=len(grouped_files)
+    
+    if lg>1: 
+      for i in range(lg):
+        NProcessed+=1
+        f=grouped_files[i][0]
+        rm=grouped_files[i][1]
+        if os.path.exists(f) and not rm and f not in BadfileList:
+          try:
+            BadFile=False
+            signal.alarm(TimeLimit+os.stat(f).st_size//100000000)
+            filecmp.cmp(f, f, shallow=not Exact)
+          except: 
+            BadFile=True
+            BadfileList.append(f)
+
+            cprint('\r'+' '*l, end='', flush=True)
+            isplit=f.split('/')
+            if len(isplit)==1: isplist=['']+isplit
+            sf='Bad file: '
+            sf+='/'.join(isplit[-2:])
+            cprint('\r'+sf, flush=True)
+            s='Processed: '+str(NProcessed)+' ['+str(NProcessed*100//NTotal)+'%] Duplicates: '+str(NRemoved)
+            cprint('\r'+s ,end='', flush=True)
+            l=len(str(s))
+            continue
+          
+          signal.alarm(0)
+          j=i+1
+          z=0
+          while j<lg:
+            fj=grouped_files[j][0]
+            rmj=grouped_files[j][1]
+            # set up time limit
+            try:
+              BadFile=False
+              signal.alarm(TimeLimit+os.stat(fj).st_size//100000000)
+              if os.path.exists(fj) and not rmj and fj not in BadfileList:
+                if filecmp.cmp(f, fj, shallow=not Exact): 
+                  if ForRemove or RemoveFile: DuplicateList.append(fj)
+                  else: DuplicateList.append(f+': '+fj)
+                  grouped_files[j][1]=True
+                  NRemoved+=1
+              
+            except Exception: 
+              BadFile=True
+              BadfileList.append(fj)
+              
+            signal.alarm(0)
+            j+=1
+
+            cprint('\r'+' '*l, end='', flush=True)
+            isplit=fj.split('/')
+            if len(isplit)==1: isplist=['']+isplit
+            if BadFile: sf='Bad file: '
+            else: sf=''
+            sf+='/'.join(isplit[-2:])
+            cprint('\r'+sf, flush=True)
+            s='Processed: '+str(NProcessed)+' ['+str(NProcessed*100//NTotal)+'%] Duplicates: '+str(NRemoved)
+            cprint('\r'+s ,end='', flush=True)
+            l=len(str(s))
+            
+    else: 
+      NProcessed+=1
+      cprint('\r'+' '*l, end='', flush=True)
+      isplit=grouped_files[0][0].split('/')
+      if len(isplit)==1: isplist=['']+isplit
+      sf='/'.join(isplit[-2:])
+      cprint('\r'+sf, flush=True)
+      s='Processed: '+str(NProcessed)+' ['+str(NProcessed*100//NTotal)+'%] Duplicates: '+str(NRemoved)
+      cprint('\r'+s ,end='', flush=True)
+      l=len(str(s))
+  
+  cprint('', flush=True)
+
+  if RemoveFile:
+    n=0
+    l=0
+    for i in DuplicateList:
+      if os.path.exists(i): 
+        os.remove(i)
+        n+=1
+      
+        isplit=i.split('/')
+        if len(isplit)==1: isplist=['']+isplit
+        s='Removed '+'/'.join(isplit[-2:])
+        cprint(s, flush=True)
+    
+    cprint('Removed '+str(n)+' files')
+
+  if Rmdir:
+    NDir=0
+    l=0
+    for subdir, dirs, fs in os.walk(rootdir):
+      dirList=os.listdir(subdir)
+      if not dirList or (len(dirList)==1 and dirList[0]=='.DS_Store'): 
+        EmptyDirList.append(subdir)
+        NDir+=1
+      
+      cprint('\r'+' '*l, end=' ', flush=True)
+      cprint('\r'+subdir,flush=True)
+      s='Found empty dirs: '+str(NDir)
+      l=len(s)
+      cprint('\r'+s, end=' ', flush=True)
+    
+    cprint('')
+
+  if RemoveFile:
+    cprint('Removed '+str(n)+' files')
+    
+    n=0
+    l=0
+    for i in EmptyDirList:
+      if os.path.exists(i): 
+        os.rmdir(i)
+        n+=1
+      
+      cprint('\r'+' '*l, end='', flush=True)
+      s='Removed empty dir '+i.split('/')[-1]
+      cprint('\r'+s ,end='', flush=True)
+      l=len(str(s))
+    cprint('')
+    cprint('Removed '+str(n)+' dirs')
+
+  if exportdir: 
+    files.fwrite(exportdir, DuplicateList+['']+EmptyDirList+['Bad files:']+BadfileList)
+    cprint('List of duplicate files and empty folders was stored in '+exportdir)
+  
+else: cprint(HelpInfo)
+  
+  
+    

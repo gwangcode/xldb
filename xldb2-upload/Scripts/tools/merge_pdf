@@ -1,0 +1,69 @@
+import stdwb as wb, files
+
+try:
+  from PyPDF2 import PdfFileReader, PdfFileWriter
+except ImportError:
+  from pyPdf import PdfFileReader, PdfFileWriter
+
+# Help information
+HelpInfo='''
+merge_pdf pdf_dir .out merged_pdf
+'''
+# Variables
+la=len(args)
+outf=''
+
+
+
+def pdf_cat(input_files, output_stream):
+  input_streams = []
+  try:
+    # First open all the files, then produce the output file, and
+    # finally close the input files. This is necessary because
+    # the data isn't read from the input files until the write
+    # operation. Thanks to
+    # https://stackoverflow.com/questions/6773631/problem-with-closing-python-pypdf-writing-getting-a-valueerror-i-o-operation/6773733#6773733
+    CountN=0
+    TotalN=len(input_files)
+    for input_file in input_files:
+      input_streams.append(files.fopen(input_file, 'rb'))
+      CountN+=1
+      Percent=int(CountN/TotalN*100)
+      cprint('\r'+str(Percent)+'%', end='', flush=True)
+    cprint('')
+    writer = PdfFileWriter()
+    
+    for reader in map(PdfFileReader, input_streams):
+      for n in range(reader.getNumPages()):
+        writer.addPage(reader.getPage(n))
+    writer.write(output_stream)
+    
+  finally:
+    for f in input_streams:
+      f.close()
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help'], pkey=['out'])
+
+if opts:
+  for i in opts:
+    if i[0]=='out': outf=i[1]
+    elif i[0]=='help': err(HelpInfo)
+    
+if free:
+  srcdir=free[1]
+  if files.exists(srcdir, Dir=True):
+    PdfList=files.findfiles(srcdir+'/*.pdf')
+    PdfList.sort(reverse=True)
+  else: cprint(srcdir+' is not a directory')
+else: err('No file designated')
+
+# Main code
+if PdfList:
+  outstrm=files.fopen(outf, 'wb')
+  pdf_cat(PdfList, outstrm)
+  outstrm.close()
+
+else: cprint('No files merged')
+  
+    

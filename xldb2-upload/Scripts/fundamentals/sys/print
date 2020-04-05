@@ -1,0 +1,3 @@
+if len(args)>1: cprint(''.join([str(i) for i in args[1:]]))
+else: cprint(_RTN)
+  

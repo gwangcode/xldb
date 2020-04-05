@@ -1,0 +1,18 @@
+import stdwb as wb
+
+HelpInfo='''
+run arguments as a command
+echo ".ls abc" && rcmd
+rcmd .ls abc
+'''
+
+CmdTxt=_RTN
+
+if CmdTxt is not None: CmdTxt=str(_RTN)
+if len(args)>1: CmdTxt=' '.join(tuple(map(str, args[1:])))
+elif CmdTxt is None: err(HelpInfo)
+
+# Main code
+return cmd(CmdTxt)
+  
+    

@@ -1,0 +1,45 @@
+import stdwb as wb, files
+
+# Help information
+HelpInfo='''
+dump open workbook objects (wb.wbset) and active path (wb.path) to file for restart:
+dump ~/Documents/abc
+load objects from dumped file
+dump .load ~/Documents/abc
+'''
+# Variables
+la=len(args)
+load=False
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['load'])
+
+if opts:
+  for i in opts:
+    if i[0]=='load': load=True
+    
+
+if free: f=free[1]
+else: err('No file designated')
+
+# Main code
+if la<=1: cprint(HelpInfo)
+elif la>1:
+  if load:
+    if files.exists(f, False):
+      d=files.load_dump(f)
+      wb.active=d['active']
+      wb.wbset=d['wb']
+      files.remove(f)
+      cprint('loaded from '+f)
+      
+    else: 
+      cprint('File ('+f+') not exists')
+      
+  else:
+    if ('/' not in f) or files.exists(f): 
+      d={'wb': wb.wbset, 'active': wb.active}
+      files.dump(d, f)
+      cprint('dumped at '+f)
+    else: cprint('Directory ('+files.fdir(f)+') not exists')
+  
+    

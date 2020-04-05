@@ -1,0 +1,8 @@
+import os, files
+HelpInfo='''cd [Dir] -> change directory'''
+la=len(args)
+if la==2:
+  Dir=files.fpath(args[1])
+  if os.path.isdir(Dir): os.chdir(Dir)
+  else: cprint('Director not exists')
+else: cprint(HelpInfo)

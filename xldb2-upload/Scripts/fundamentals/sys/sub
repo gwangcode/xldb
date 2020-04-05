@@ -1,0 +1,133 @@
+import stdwb as wb, multi, files, os, sys, traceback, io, signal, psutil, fnmatch, dill
+from multiprocess import Process, Manager
+
+# Help information
+HelpInfo='''
+run cmd on the background
+sub cmd .in infile .out outfile -> infile: stdin file, outfile: stdout file; It directs to empty [io.StringIO('')] if not designated.
+        .kill PID -> kill process and its subprocesses by PID 
+        .list -> list all running processes
+        .list PID -> list PID
+        .rtnf file -> return value file, a binary file
+'''
+# Variables & Functions
+la=len(args)
+InFile=''
+OutFile=''
+KillPID=None
+CmdTxt='' 
+ListProcs=False
+ListPID=None
+RtnF=''
+
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help', ], pkey=['in', 'out', 'rtnf', 'kill', 'list'])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    elif i[0]=='in': InFile=files.fpath(str(i[1]))
+    elif i[0]=='out': OutFile=files.fpath(str(i[1]))
+    elif i[0]=='kill': KillPID=int(i[1])
+    elif i[0]=='rtnf': RtnF=files.fpath(i[1])
+    elif i[0]=='list': 
+      ListProcs=True
+      if i[1]: ListPID=str(i[1])
+    
+if free: 
+  lf=len(free)
+  if lf==2: CmdTxt=' '.join(free[1:])
+  #else: err('Illegal parameters')
+else: err('Illegal parameters')
+
+# Main code
+def clear():
+  if multi.proc:
+    for i in range(len(multi.proc)):
+      if multi.proc[i] not in psutil.pids(): multi.proc.pop(i)
+
+def kill_proc_tree(pid, sig=signal.SIGTERM, include_parent=True,
+                   timeout=None, on_terminate=None):
+    """Kill a process tree (including grandchildren) with signal
+    "sig" and return a (gone, still_alive) tuple.
+    "on_terminate", if specified, is a callabck function which is
+    called as soon as a child terminates.
+    """
+    if pid != os.getpid():
+      parent = psutil.Process(pid)
+      children = parent.children(recursive=True)
+      if include_parent:
+          children.append(parent)
+      for p in children:
+          p.send_signal(sig)
+      gone, alive = psutil.wait_procs(children, timeout=timeout,
+                                      callback=on_terminate)
+      return (gone, alive)
+
+
+
+def subprocess(Cmd, CmdName, InFile, OutFile, RtnF):
+  sys.stdin=io.StringIO('')
+  sys.stdout=io.StringIO('')
+  RF=InF=OutF=None
+  RtnV=io.StringIO('')
+  
+  if InFile:
+    if os.path.isfile(InFile): 
+      InF=files.fopen(InFile, 'r+')
+      sys.stdin=InF
+  if OutFile:
+    if files.exists(OutFile, True): 
+      OutF=files.fopen(OutFile, 'w+')
+      sys.stdout=OutF
+  if RtnF:
+    if files.exists(RtnF, True): 
+      RF=files.fopen(RtnF, 'wb+')
+      RtnV=RF
+  
+  try: 
+    rtnv=cmd(str(Cmd))
+    dill.dump(rtnv, RtnV)
+  except:
+    etype, value, tb=sys.exc_info()
+    e=traceback.format_exception(etype,value, tb)
+    prt=False
+    for i in e:
+      if '<string>' in i: 
+        prt=True
+        cprint('Command <'+CmdName+'> error: line '+str(int(i.split(',')[1].split()[1])-1)+' ')
+        continue
+      if prt: cprint(i, end='')
+
+  finally:
+    if InF: InF.close()
+    if OutF: OutF.close()
+    if RF: RF.close()
+
+def submit(Cmd, InFile, OutFile, RtnF):
+  CmdName=Cmd.split()
+  CmdName=CmdName[0]
+  p = Process(target = subprocess, args=(Cmd, CmdName, InFile, OutFile, RtnF))
+  p.start()
+  multi.proc.append(p.pid)
+  cprint(str(p.pid)+' '+str(CmdName))
+  return p.pid
+
+clear() 
+if KillPID:
+   if KillPID in psutil.pids(): kill_proc_tree(KillPID)
+elif ListProcs:
+  PList=[]
+  for p in psutil.process_iter(['pid', 'name']):
+    pName=p.info['name']
+    pPID=p.info['pid']
+    if ListPID:
+      if fnmatch.fnmatch(str(pPID), str(ListPID)) and pPID in multi.proc: cprint(str(pPID)+': '+pName)
+    else:
+      if pPID in multi.proc: cprint(str(pPID)+': '+pName)
+
+  return PList
+    
+    
+else: submit(CmdTxt, InFile, OutFile, RtnF)

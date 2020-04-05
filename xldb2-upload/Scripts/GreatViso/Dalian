@@ -1,0 +1,28 @@
+$. open =args[1] .as ori
+$. open =args[2] .as des
+$. fetch .from /ori/Sheet1/B2:B .to /des/Sheet1/A3 # Tracking
+$. fetch .from /ori/Sheet1/F2:F .to /des/Sheet1/C3 # Receiver
+$. fetch .from /ori/Sheet1/G2:G .to /des/Sheet1/D3 # Receiver Phone
+$. fetch .from /ori/Sheet1/H2:H .to /des/Sheet1/E3 # Receiver Province
+$. fetch .from /ori/Sheet1/I2:I .to /des/Sheet1/F3 # Receiver City
+$. fetch .from /ori/Sheet1/L2:L .to /des/Sheet1/H3 # Receiver Zip
+$. fetch .from /ori/Sheet1/J2:J .to /des/Sheet1/I3 # Receiver Address
+
+Items=$. fetch .from /ori/Sheet2/B2:G
+ItemDict={}
+for i in Items :
+  Tracking=i[0]
+  Item=i[1]
+  Number=i[5]
+  if Tracking not in ItemDict.keys(): ItemDict[Tracking]=Item.strip()+'x'+str(Number.strip())
+  else: ItemDict[Tracking]=ItemDict[Tracking]+' '+Item.strip()+'x'+str(Number.strip())
+
+TrackingList=$. fetch .from /des/Sheet1/B3:B
+for n in range(len(TrackingList)):
+  N=n+3
+  if TrackingList[n] in ItemDict.keys():
+    N='/des/Sheet1/L'+str(N)
+    $. fetch =ItemDict[TrackingList[n]] .to =N
+
+$. save des
+$. close ori des

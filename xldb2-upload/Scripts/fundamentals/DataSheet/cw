@@ -1,0 +1,23 @@
+import stdwb as wb
+la=len(args)
+if la>1: arg=args[1]
+else: arg=_RTN
+
+if arg=='/': 
+  wb.active=''
+  return wb.active
+elif arg=='..':
+  s=wb.active.split('/')+[None, None]
+  wkbk, sheet=s[:2]
+  if sheet: wb.active=wkbk
+  else: wb.active=''
+  return wb.active
+else: 
+  wkbk, sheet, cell=wb.split_wbname(arg)
+  if wkbk in wb.wblist():
+    if sheet: wb.active=wkbk+'/'+sheet
+    else: wb.active=wkbk
+    return wb.active
+  
+    
+    

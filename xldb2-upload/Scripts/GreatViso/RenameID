@@ -1,0 +1,16 @@
+import stdwb as wb, os
+for i in wb.findfiles(args[1]):
+  f=wb.File_Path_Parser(i)
+  if '_' in str(f.File): 
+    NewFName=f.File.split('_')[1]
+    cprint(NewFName)
+  elif '-' in str(f.File): 
+    NewFName=f.File.split('-')[1]
+    cprint(NewFName)
+  else: 
+    NewFName=f.File
+    cprint(f.File)
+  NFile=f.Path+'/'+NewFName+f.Extension
+  os.rename(i, NFile)
+  
+    

@@ -1,0 +1,158 @@
+import stdwb as wb, re, dlist, datatype
+
+# Help information
+HelpInfo=''' 
+insert -> insert columns or rows
+insert 1 .at /w/s/A -> insert 1 col at A
+insert /w/s/A:C  insert cols from A to C -> insert Cols A, B, C from A
+insert =[Col name list] .at /w/s/Student.A  -> insert cols by name at col id.
+insert Student. Gender. … .at /w/s/id.  -> insert cols by name at col id.
+insert .data =[[...], [...], ...] .at /w/s/A  -> insert data (DLIST) at A
+insert .data =[Student, Gang, Cindy, ...] .data =[Gender, M, F, ...] .at /w/s/Student.C  -> insert cols at C
+
+insert 10 .at /w/s/5  -> insert 10 rows at row 5
+insert /w/s/10:20 -> insert 10 rows from 10 up to 20
+insert .data =[123, 'Gang', 'Male', ...] .data [234, 'Cindy', 'Female', ...] .at /w/s/12 -> insert rows at 12
+'''
+# Variables
+#la=len(args)
+N=1
+Pos=None
+Insersion=None
+Data=[]
+InsertRow=False
+Help=False
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, pkey=['at', 'data'], nkey=['help'])
+
+if opts:
+  for i in opts:
+    if i[0]=='at': Pos=i[1]
+    elif i[0]=='help': Help=True
+    elif i[0]=='data': 
+      if i[1]: i1=i[1]
+      else: i[1]=_RTN
+      Data.append(i1)
+      
+if len(free)>=2: Insersion=free[1:]
+else: Insersion=_RTN
+
+# Main code
+if Help: err(HelpInfo)
+
+# Pos
+if Pos:
+  w, s, c=wb.split_wbname(Pos)
+  c=datatype.num(c)
+  if type(c) is int: # insert row
+    if c<=0: err('Insert position should be positive')
+  else: c=wb.cellname(wb.compose(w, s, c))[1] # insert col
+
+# Insersion
+if Insersion:
+  if len(Insersion)==1:
+    Insersion=datatype.num(Insersion[0])
+    if type(Insersion) is int:
+      if Insersion<0: err('Number of insersions should be positive')
+    elif type(Insersion) is str: # A:C, 10:20
+      w, s, c=wb.split_wbname(Insersion)
+      #Insersion=datatype.num(c)
+      Ins=c.split(':')
+      if len(Ins)!=2: err('a range is expected')
+      else:
+        if Ins[1]:
+          Ins=wb.cellname(c) # 1:3 or Student.A:Gender.C 
+          if Ins[1]: Start=Ins[1] # 1
+          elif Ins[2]: Start=Ins[2] # A
+          if Ins[4]: End=Ins[4] # 3
+          elif Ins[5]: End=Ins[5] # C
+          Start=datatype.num(Start)
+          End=datatype.num(End)
+        else: err('No end range')
+        
+  else: # =[...]
+    for i in range(len(Insersion)):
+      n=wb.colname(str(Insersion[i]))
+      if n is None: cprint(Insersion[i]+' is illegal name')
+      else: Insersion[i]=n
+    if not all(Insersion): return
+
+# Data
+elif Data:
+  if type(Pos) is not int: Data=dlist.transpose(dlist.complete(Data)) # inert col
+
+else: err('No insersion designated')
+
+##############
+if Insersion is not None:
+  if type(Insersion) is int: # 0, 1, 2 ...
+    if type(c) is int:
+      Max=wb.maxrow('/'+w+'/'+s)
+      if c<=Max: 
+        wb.insert(str(c), row=Insersion)
+        cprint('Inserted '+str(Insersion)+' row(s) at '+str(Pos))
+        return Insersion, Pos
+      else: cprint('Unable to insert out of the max row of '+str(Max))
+    else:
+      Max=wb.maxcol('/'+w+'/'+s)
+      if wb.col2num(c)<=Max:
+        wb.insert(c, col=Insersion)
+        cprint('Inserted '+str(Insersion)+' col(s) at '+str(Pos))
+        return Insersion, Pos
+      else: cprint('Unable to insert out of the max col of '+str(Max))
+        
+  elif type(Insersion) in (tuple, list): # [...]
+    Max=wb.maxcol('/'+w+'/'+s)
+    ncol=len(Insersion)
+    if wb.col2num(c)<=Max:
+      wb.insert(c, col=ncol)
+      wb.write(wb.compose(w, s, c+'1'), Insersion)
+      cprint('Inserted '+str(ncol)+' col(s) at '+str(Pos))
+      return ncol, Pos
+    else: cprint('Unable to insert out of the max col of '+str(Max))
+
+  else: # A:C or 1:3
+    Start=datatype.num(Start)
+    End=datatype.num(End)
+    if type(Start) is int: # 1:3
+      Max=wb.maxrow('/'+w+'/'+s)
+      if Start<End and End<=Max: 
+        nrow=End-Start+1
+        wb.insert(str(Start), row=nrow)
+        cprint('Inserted '+str(nrow)+' row(s) at '+str(Start))
+        return nrow, Start
+      else: cprint('Unable to insert out of the max row of '+str(Max))
+    else: # A:C
+      Max=wb.maxcol('/'+w+'/'+s)
+      NStart=wb.col2num(Start)
+      NEnd=wb.col2num(End)
+      NCol=NEnd-NStart+1
+      if NStart<NEnd and NEnd<=Max:
+        wb.insert(Start, col=NCol)
+        cprint('Inserted '+str(NCol)+' col(s) between '+str(Start)+' and '+str(End))
+        return Start, End
+      else: cprint('Unable to insert out of the max col of '+str(Max))
+    
+elif Data:
+  NRow, NCol=dlist.dimension(Data)
+  if type(c) is int: 
+    Max=wb.maxrow('/'+w+'/'+s)
+    if c<=Max:
+      wb.insert(c, row=NRow)
+      wb.write('A'+str(c), Data) # insert row
+      cprint('Inserted '+str(NRow)+' row(s) at'+str(c))
+      return Data
+    else: cprint('Unable to insert out of the max row of '+str(Max))
+  else: 
+    Max=wb.maxcol('/'+w+'/'+s)
+    if c<=Max:
+      wb.insert(c, col=NCol)
+      wb.write(c+'1', Data) # insert col
+      cprint('Inserted '+str(NCol)+' col(s) at'+str(c))
+      return Data
+    else: cprint('Unable to insert out of the max col of '+str(Max))
+
+else: err('Illegal input')
+
+    

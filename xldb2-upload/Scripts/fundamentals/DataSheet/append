@@ -1,0 +1,162 @@
+import stdwb as wb, re, dlist, datatype
+
+# Help information
+HelpInfo=''' 
+append -> append columns or rows
+
+append =[Col name list] .at /w/s/Student.A  -> insert cols by name behind col id. 
+append Student. Gender. … .at /w/s/id.  -> insert cols by name behind col id.
+append =[Col name list] [.at w/s] -> append cols by name
+append Student. Gender. …  [.at w/s] -> append cols by name
+
+append .data =[[...], [...], ...] .at /w/s/A  -> insert data (DLIST) behind A
+append .data =[Student, Gang, Cindy, ...] .data =[Gender, M, F, ...] .at /w/s/Student.C  -> insert cols behind C
+append .col/.row =[[...], [...], ...] [.at w/s] -> append data (DLIST) 
+append .col =[Student, Gang, Cindy, ...] .col =[Gender, M, F, ...] [.at w/s] -> append cols 
+
+append .data =[123, 'Gang', 'Male', ...] .data =[234, 'Cindy', 'Female', ...] .at /w/s/12 -> insert rows behind 12
+append .row =[123, 'Gang', 'Male', ...] .row =[234, 'Cindy', 'Female', ...] [.at /w/s] -> append rows
+'''
+# Variables
+#la=len(args)
+N=1
+Pos=None
+Insersion=None
+DListData=[]
+AppendCol=True
+Data=[]
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, pkey=['at', 'data', 'col', 'row'], nkey=['help'])
+
+if opts:
+  for i in opts:
+    if i[0]=='at': Pos=i[1]
+    elif i[0]=='help': err(HelpInfo)
+  for i in opts:
+    if i[0]=='data': 
+      if i[1]: i1=i[1]
+      else: i1=_RTN
+
+      if dlist.is_dlist_alike(i1):  DListData=dlist.complete(i1)
+      else: Data.append(i1)
+        
+    elif i[0]=='col': 
+      if i[1]: i1=i[1]
+      else: i1=_RTN
+
+      if dlist.is_dlist_alike(i1): DListData=dlist.complete(i1)
+      else: Data.append(i1)
+      AppendCol=True
+    elif i[0]=='row': 
+      if i[1]: i1=i[1]
+      else: i1=_RTN
+
+      if dlist.is_dlist_alike(i1): DListData=dlist.complete(i1)
+      else: Data.append(i1)
+      AppendCol=False
+
+lf=len(free)      
+if lf==1: Insersion=_RTN
+elif lf==2:
+  if type(free[1]) in (tuple, list): Insersion=free[1]
+  else: Insersion=[free[1]]
+elif lf>2: Insersion=free[1:]
+
+# Main code
+
+# Pos
+if Pos:
+  w, s, c=wb.split_wbname(Pos)
+  if not c: 
+    if AppendCol: c=wb.num2col(wb.maxcol(wb.compose(w, s)))
+    else: c=wb.maxrow(wb.compose(w,s))
+  c=datatype.num(c)
+  if type(c) is int: # insert row
+    if c<=0: err('Insert position should be positive')
+  else: c=wb.cellname(wb.compose(w, s, c))[1] # insert col
+
+else:
+  if wb.split_wbname(wb.active):
+    if AppendCol: cmax=wb.num2col(wb.maxcol(wb.active))
+    else: cmax=str(wb.maxrow(wb.active))
+    w, s, c=wb.split_wbname(cmax)  
+    c=datatype.num(c)
+  else: err('No sheet is designated')
+    
+
+# Insersion
+if Insersion:
+  for i in range(len(Insersion)):
+    n=wb.colname(str(Insersion[i]))
+    if n is None: cprint(Insersion[i]+' is illegal name')
+    else: Insersion[i]=n
+  if not all(Insersion): return
+
+# Data
+elif Data:
+  if type(c) is not int: Data=dlist.transpose(dlist.complete(Data)) # insert col
+
+elif DListData: Data=DListData
+
+else: err('No data designated')
+#print(Data)
+
+##############
+if Insersion is not None:    
+  if type(Insersion) in (tuple, list): # [...]
+    Max=wb.num2col(wb.maxcol('/'+w+'/'+s))
+    ncol=len(Insersion)
+    if Pos:
+      if wb.col2num(c)<wb.col2num(Max):
+        cc=wb.add_cell(c,col=1)
+        wb.insert(wb.compose(w,s,cc), col=ncol)
+        wb.write(wb.compose(w, s, cc+'1'), Insersion)
+        cprint('Inserted '+str(ncol)+' col(s) at '+str(Pos))
+        return Insersion
+      elif wb.col2num(c)==wb.col2num(Max): 
+        wb.write(wb.compose(w, s, wb.add_cell(c,col=1)+'1'), Insersion)
+        cprint('Appened '+str(ncol)+' col(s) at '+str(Pos))
+        return Insersion
+      else: cprint('Unable to insert out of the max col of '+str(Max))
+    else:
+      wb.write(wb.compose(w, s, wb.add_cell(Max,col=1)+'1'), Insersion)
+      cprint('Appened '+str(ncol)+' col(s)')
+      return Insersion
+  else: err('Illegal input')
+  
+elif Data:
+  NRow, NCol=dlist.dimension(Data)
+  
+  if type(c) is int: 
+    Max=wb.maxrow('/'+w+'/'+s)
+    if c<Max:
+      wb.insert(wb.compose(w,s,str(c+1)), row=NRow)
+      wb.write(wb.compose(w,s,'A'+str(c+1)), Data) # insert row
+      cprint('Inserted '+str(NRow)+' row(s) behind '+str(c))
+      return Data
+    elif c==Max:
+      wb.write(wb.compose(w,s,'A'+str(c+1)), Data) # insert row
+      cprint('Appended '+str(NRow)+' row(s) behind ' +str(c))
+      return Data 
+    else: cprint('Unable to insert out of the max row of '+str(Max))
+  else:
+    # needs to add code to append col
+    Max=wb.maxcol('/'+w+'/'+s)
+    d=wb.add_cell(c, col=1)
+    
+    if wb.col2num(c)<Max:
+      wb.insert(wb.compose(w,s,d), col=NCol)
+
+      wb.write(wb.compose(w,s,d), Data) # insert col
+      cprint('Inserted '+str(NCol)+' col(s) behind '+str(c))
+      return Data
+    elif wb.col2num(c)==Max:
+      wb.write(wb.compose(w,s,d+'1'), Data) # insert col
+      cprint('Appended '+str(NCol)+' col(s) behind '+str(c))
+      return Data 
+    else: cprint('Unable to insert out of the max col of '+str(Max))
+  
+else: err('Illegal input')
+
+    

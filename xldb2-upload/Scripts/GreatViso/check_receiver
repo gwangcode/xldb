@@ -1,0 +1,73 @@
+import stdwb as wb, datetime, files, os
+
+# Help information
+HelpInfo='''
+check the receivers only made of Chinese characters. If not, remove non-Chinese characters and if the name is less than 2 Chinese characters, it is illegal
+check_id xlsx-file
+'''
+# Variables & Functions
+la=len(args)
+File=''
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help'], pkey=[])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+  
+    
+
+if free: 
+  lf=len(free)
+  if lf==2: File=free[1]
+  else: err('Illegal parameters')
+else: err('Illegal parameters')
+
+# Main code
+def ishan(Char):
+    # for python 3.x
+    return '\u4e00' <= Char <= '\u9fff'
+
+
+def checkName(Name):
+  '''
+  Remove non-Chinese characters in Name
+  '''
+  r=''
+  for c in Name:
+    if ishan(c): r+=c
+  return r
+
+  
+
+$. close wkbk;
+File=files.fpath(File)
+if os.path.isfile(File):
+  $. open =File .as wkbk;
+  if 'wkbk' not in `.lw *;`: err(File+' unable to be opened')
+else: err(File+' not exists')
+
+# check receivers
+for i in range(2, `.shsize .row wkbk/Sheet1;`+1):
+  Name=$. fetch .from ='wkbk/Sheet1/F'+str(i)
+  PreName=Name.strip()
+  Name=checkName(Name)
+  if len(Name)>=2: 
+    $. fetch =Name .to ='wkbk/Sheet1/F'+str(i)
+    if PreName!=Name: cprint(str(i)+': '+PreName+' -> '+Name)
+  else:
+    ContentO=$. fetch .from ='wkbk/Sheet1/O'+str(i)
+    if ContentO is None: ContentO=''
+    else: ContentO=str(ContentO).strip()
+    $. fetch "=ContentO+' <-Incorrect receiver name'" .to ='wkbk/Sheet1/O'+str(i)
+    cprint(str(i)+': '+PreName+' -> '+Name)
+
+$. save wkbk;
+$. close wkbk;
+
+
+
+
+
+  
+    
