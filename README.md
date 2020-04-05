@@ -1,5 +1,28 @@
 # xldb
-a platform to operate xlsx data in terminals/command lines
+A platform to operate xlsx data in terminals/command lines
+
+This is a platform based on python to run commands and scripts mainly for manipulating data in xlsx files using openpyxl library.
+
+Compositions:
+
+  xldb.py is the platform command. You can type:
+
+            ./xldb.py
+
+  to start the platform's command environment.
+
+  xldb.py relies on sys, os, glob, shlex, re, prompt_toolkit, traceback, fnmatch, io libraries.
+  
+  Paths.set is the setup file to designate Libraries directory, Script Directory, Initial imports, End-command and Autocomplete script. The file is written in the following form:
+
+          LibDir=Libs
+          ScriptDir=Scripts
+          Imports=stdwb as wb, openpyxl as xl, multi
+          EndCmd=EndCmd
+          AutoComplete=AUTOCOMPLETE
+
+
+
 
 In command environment:
 
