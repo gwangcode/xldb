@@ -207,11 +207,11 @@ def _single_cell_name(Str):
   Col=None 
   Row=None 
   if lcm==1: # no .
-    m=re.match('^([A-Za-z]*)([0-9]*)$',cm[0])
+    m=re.match('^(-[A-Za-z]+|[A-Za-z]*)(-[0-9]+|[0-9]*)$',cm[0])
     if m: Col, Row=m.groups()
   elif lcm==2: # Student.A2
     if cm[0]: Name=cm[0]
-    m=re.match('^([A-Za-z]*)([0-9]*)$',cm[1])
+    m=re.match('^(-[A-Za-z]+|[A-Za-z]*)(-[0-9]+|[0-9]*)$',cm[1])
     if m: Col, Row=m.groups()
   return Name, Col, Row
 
@@ -220,7 +220,11 @@ def exheader_col(Workbook, Sheet, Header=None, Col=None):
 
   if Header or Col:
     if Header in (None, ''): # Col to header
-      
+      if Col.startswith('-'):
+        MCol=maxcol(compose(Workbook, Sheet))
+        Col=col2num(Col[1:])
+        Col=num2col(max(1, MCol+1-Col))
+
       for i in L:
         iL=i.split('.')
         if len(iL)==1: 
