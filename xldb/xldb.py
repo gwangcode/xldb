@@ -17,7 +17,7 @@ ImportLibs=''
 BeginCmd=''
 EndCmd=''
 FuncLib='' # Python Function Libraries: .py libraries Dir
-ScriptDir='' # Script Directories: Command Dir
+ScriptDir=[] # Script Directories: Command Dir
 BinPath=os.path.dirname(os.path.realpath(__file__))
 PathsSetFilePath=BinPath+'/Paths.set' # Path of Paths.set
       
@@ -71,24 +71,40 @@ def _read_paths_set_file(Path): # read Paths.set into FuncLib and ScriptDir
   L=f.readlines()
   if L:
     for i in L:
-      Li=i.split('=')
-      if Li[0].strip() == 'LibDir': FuncLib=BinPath+'/'+Li[1].strip()
-      elif Li[0].strip() == 'ScriptDir': ScriptDir=BinPath+'/'+Li[1].strip()
-      elif Li[0].strip() == 'Imports': ImportLibs=Li[1].strip()
-      elif Li[0].strip() == 'BeginCmd': BeginCmd=Li[1].strip()
-      elif Li[0].strip() == 'EndCmd': EndCmd=Li[1].strip()
-      elif Li[0].strip() == 'AutoComplete': AutoComplete=Li[1].strip()
+      if i:
+        i=i.split('#')[0]
+        Li=i.split('=')
+        if Li[0].strip() == 'LibDir': FuncLib=BinPath+'/'+Li[1].strip()
+        elif Li[0].strip() == 'ScriptDir': 
+          for i in Li[1].split(';'):
+            if i:
+              i=i.strip()
+              j=i.split('/')
+              if j[0]=='@': ScriptDir.append(BinPath+'/'+'/'.join(j[1:]))
+              else: ScriptDir.append(File_Path_Parser(i).Full)
+              
+        elif Li[0].strip() == 'Imports': ImportLibs=Li[1].strip()
+        elif Li[0].strip() == 'BeginCmd': BeginCmd=Li[1].strip()
+        elif Li[0].strip() == 'EndCmd': EndCmd=Li[1].strip()
+        elif Li[0].strip() == 'AutoComplete': AutoComplete=Li[1].strip()
       
-def _find_file_in_paths(FileName): # IsCmd: Search in ScriptDir, not IsCmd: Search in FuncLib
+def _find_file_in_paths(FileName, AbsPath=False): # IsCmd: Search in ScriptDir, not IsCmd: Search in FuncLib
   global ScriptDir
-  try: r=glob.glob(ScriptDir+'/'+FileName, recursive=True)
-  except: r=None
-  if r: return r[0]
-  else: 
-    try:
-      r=glob.glob(ScriptDir+'/**/'+FileName, recursive=True)
-    except: r=None
-    if r: return r[0]
+  if AbsPath: 
+    try: 
+      r=File_Path_Parser(FileName).Full
+      if os.path.isfile(r): return r
+    except: return None
+  else:
+    for Dir in ScriptDir:
+      try: r=glob.glob(Dir+'/'+FileName, recursive=True)
+      except: r=None
+      if r: return r[0]
+      else: 
+        try:
+          r=glob.glob(Dir+'/**/'+FileName, recursive=True)
+        except: r=None
+        if r: return r[0]
 
 # _PrintOut=True: print objects to screen, print OffObj to $%0 (OffOutVar=0)
 # _PrintOut=False: print OffObj to $%0 (OffOutVar=0)
@@ -328,11 +344,17 @@ def cmd(CMD, NoExit=False, Glbs={}, AutoComplete=False, IsTop=False, External={}
 
         if cmd[0]=='/': RValue=_run_one_line_pycmd(cmd[1:], Glbs=Glbs) # /f=3+5: python one line script
         elif cmd[0]=='.': RValue=_run_shell_cmd(cmd[1:], rvar, Glbs=Glbs)
-        else: RValue=_run_one_cmd(cmd, rvar, NoExit, Glbs=Glbs)
+        else: 
+          if cmd[0]=='@': # run a command at a designated path
+            AbsPath=True 
+            cmd=cmd[1:]
+          else: AbsPath=False
+        
+          RValue=_run_one_cmd(cmd, rvar, NoExit, Glbs=Glbs, AbsPath=AbsPath)
         
     return RValue
     
-def _run_one_cmd(CMD, RVar='', NoExit=False, Glbs={}, AutoComplete=False): # parse command line and pass command to run_script
+def _run_one_cmd(CMD, RVar='', NoExit=False, Glbs={}, AutoComplete=False, AbsPath=False): # parse command line and pass command to run_script
   global _PrintOut, Quit, StdOut
   TempPrintOutStatus=_PrintOut
   NoPrint=False
@@ -350,7 +372,7 @@ def _run_one_cmd(CMD, RVar='', NoExit=False, Glbs={}, AutoComplete=False): # par
     if AutoComplete: args=RawArg
     else: args=[_parse_parameter(i, Glbs) for i in RawArg]
     Glbs['args']=args
-    CmdPath=_find_file_in_paths(args[0]) 
+    CmdPath=_find_file_in_paths(args[0], AbsPath=AbsPath) 
     if CmdPath: 
       if NoPrint: 
         _PrintOut=False

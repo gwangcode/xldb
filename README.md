@@ -40,9 +40,9 @@ cmd abc def
 
 cmd “=`.cmd2 abc`”
 
+@~/Documents/abc -> run command abc in the designated path
+
 abc/def: designate the path of the command, this equals: .../Script/abc/def
-
-
 
 
 In script environment:
