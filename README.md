@@ -50,6 +50,18 @@ In script environment:
 $.abc or `.abc` : run command
 $.abc:print =x or `🔤🔤:abc:print =x`: run command with external variable abc
 
+In Paths.set:
+  LibDir=@/Libs;
+  ScriptDir=@/Scripts; # ; separate the directories that store the commands; After # is the comment, @ represents the Bin-Directory, the directory where xldb.py is
+  Imports=stdwb as wb, openpyxl as xl, multi
+  EndCmd=EndCmd
+  AutoComplete=AUTOCOMPLETE
+
+  LiDir designates the diretcotries of the import libraries, where @ represents the xldb.py directory; ';' separates paths; The comments are behind '#' 
+  ScriptDir designates the command paths; ';' separate the directories that store the commands; After # is the comment, @ represents the xldb.py directory
+  Imports: imports libraries at the initial
+  EndCmd designates the command that runs after each command line is finished. It contains the prompt information.
+  AutoComplete designates the autocomplete command that autocompletes the input
 
 In both environments:
 
