@@ -16,7 +16,7 @@ AutoComplete=''
 ImportLibs=''
 BeginCmd=''
 EndCmd=''
-FuncLib='' # Python Function Libraries: .py libraries Dir
+FuncLib=[] # Python Function Libraries: .py libraries Dir
 ScriptDir=[] # Script Directories: Command Dir
 BinPath=os.path.dirname(os.path.realpath(__file__))
 PathsSetFilePath=BinPath+'/Paths.set' # Path of Paths.set
@@ -74,7 +74,14 @@ def _read_paths_set_file(Path): # read Paths.set into FuncLib and ScriptDir
       if i:
         i=i.split('#')[0]
         Li=i.split('=')
-        if Li[0].strip() == 'LibDir': FuncLib=BinPath+'/'+Li[1].strip()
+        if Li[0].strip() == 'LibDir': 
+          for i in Li[1].split(';'):
+            if i:
+              i=i.strip()
+              j=i.split('/')
+              if j[0]=='@': FuncLib.append(BinPath+'/'+'/'.join(j[1:]))
+              else: FuncLib.append(File_Path_Parser(i).Full)
+
         elif Li[0].strip() == 'ScriptDir': 
           for i in Li[1].split(';'):
             if i:
@@ -409,7 +416,7 @@ def scriptdir():
 def initsys(): # initialize the system
   global PathsSetFilePath, FuncLib, glbs, ImportLibs
   _read_paths_set_file(PathsSetFilePath) # read paths.set
-  sys.path.append(FuncLib) # add function library directories from FuncLib
+  for i in FuncLib: sys.path.append(i) # add function library directories from FuncLib
   import builtins
   builtins.cprint=glbs['cprint']=globals()['cprint']
   builtins.cmd=glbs['cmd']=globals()['cmd']

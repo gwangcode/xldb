@@ -1,5 +1,5 @@
-LibDir=Libs
-ScriptDir=Scripts
+LibDir=@/Libs;
+ScriptDir=@/Scripts; # ; separate the directories that store the commands; After # is the comment, @ represents the Bin-Directory, the directory where xldb.py is
 Imports=stdwb as wb, openpyxl as xl, multi
 EndCmd=EndCmd
 AutoComplete=AUTOCOMPLETE
