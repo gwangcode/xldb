@@ -409,9 +409,9 @@ def prompt(Str, CWD=True):
   if CWD: F='{'+File_Path_Parser(os.getcwd()).File+'}'
   Prompt=F+Str
 
-def scriptdir():
-  global ScriptDir
-  return ScriptDir
+def bindir():
+  global BinPath
+  return BinPath
 
 def initsys(): # initialize the system
   global PathsSetFilePath, FuncLib, glbs, ImportLibs
@@ -425,7 +425,7 @@ def initsys(): # initialize the system
   builtins.prompt=glbs['prompt']=globals()['prompt']
   builtins.setprint=glbs['setprint']=globals()['setprint']
   #builtins.GLB=globals()['GLB']
-  builtins.scriptdir=globals()['scriptdir']
+  builtins.bindir=globals()['bindir']
   exec('import '+ImportLibs, glbs)
   prompt('')
   return ImportLibs
