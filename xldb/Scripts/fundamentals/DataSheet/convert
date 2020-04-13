@@ -1,0 +1,43 @@
+import stdwb as wb, pyexcel as p, files, os
+
+# Help information
+HelpInfo='''
+Convert Excel file format
+convert xl-file1 xl-file2
+e.g. convert abc.xls abc.xlsx
+'''
+# Variables & Functions
+la=len(args)
+Formats=['csv', 'tsv', 'csvz', 'tsvz', 'xls', 'xlsx', 'xlsm', 'ods', 'json', 'html', 'simple', 'rst', 'mediawiki']
+Extension='xlsx'
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help']+Formats, pkey=['???'])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    elif i[0] in Formats: Extension=i[0]
+    else: pass
+    
+
+if free: 
+  lf=len(free)
+  if lf==2: 
+    File1=files.fpath(free[1])
+    File2=files.File_Path_Parser(File1).Path+'/'+files.File_Path_Parser(File1).File+'.'+Extension
+  elif lf>=3: File1, File2=free[1:3] 
+  else: err('Illegal parameters')
+else: err('Illegal parameters')
+
+# Main code
+
+if os.path.isfile(File1):
+  if files.exists(File2, True):
+    Ext=files.File_Path_Parser(File2).Extension
+    Ext=Ext[1:]
+    if  Ext in Formats: p.save_book_as(file_name=File1, dest_file_name=File2)
+    else: err(Ext+' is not supported')
+  else: err(files.File_Path_Parser(File2).Path+' not exists')
+else: err(File1+' not exists')
+  
+    

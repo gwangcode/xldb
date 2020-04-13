@@ -1,2 +1,0 @@
-import cellpath as cs 
-for i in cs.iterate(args[1]): cprint(i)

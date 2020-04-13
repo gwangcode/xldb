@@ -382,7 +382,7 @@ def write(CellPath, Data=None):
   if wb(wkbk).is_writeonly():
     if type(Data) in (tuple, list):
       for row in Data: 
-        wbcls(wkbk).d[sheet].append([None if i=='' else x for i in row])
+        wbcls(wkbk).d[sheet].append([None if i=='' else i for i in row])
   else:
     if type(Data) in (tuple, list):
       if type(Data[0]) in (tuple, list): # DLIST

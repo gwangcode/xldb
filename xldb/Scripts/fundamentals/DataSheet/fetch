@@ -245,6 +245,7 @@ if ByCol: r=dlist.transpose(r)
 Rtn=r
 
 if ToFile: # .to
+
   BeginColName, BeginCol, BeginRow=wb.cellname(ToFile)[:3]
   w, s, c=wb.split_wbname(ToFile)  
   if w not in wb.wblist(): err('Workbook ('+w+') not open')
@@ -273,7 +274,6 @@ if ToFile: # .to
     else: 
       r=[i if type(i) in Writeable else str(i) for i in r]
 
-    #cprint(r)
   
   if Match:
     if WithHeader: 

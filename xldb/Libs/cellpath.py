@@ -106,20 +106,18 @@ def complete_path(Path, Array=False, WithRow=False):
           if not BeginCol: 
             if not BeginName: BeginCol='A'
             else: return None
-          if not BeginRow: 
-            if not BeginName: BeginRow='1'
-            else: return None
+          if not BeginRow: BeginRow='1'
+          
           if not EndCol: 
             if not EndName: EndCol=wb.num2col(wb.maxcol(wb.compose(w, s)))
             else: return None
-          if not EndRow: 
-            if not EndName: EndRow=str(wb.maxrow(wb.compose(w, s)))
-            else: return None
+          if not EndRow: EndRow=str(wb.maxrow(wb.compose(w, s)))
+        
           BeginRange=wb.cellname(wb.compose(w, s, BeginCol+BeginRow))[:3]
           EndRange=wb.cellname(wb.compose(w, s, EndCol+EndRow))[:3]
           Range=list(BeginRange)+list(EndRange)
           if not Array: Range=_str_name(Range[1])+_str_name(Range[2])+':'+_str_name(Range[4])+_str_name(Range[5])
-
+        
       else: # /w/s/A  
         Name, Col, Row=wb.cellname(wb.compose(w,s,c))[:3]
         if Array: Range=[Name, Col, Row]
@@ -250,7 +248,3 @@ class iterate:
             self.nSh+=1
             continue
         else: raise StopIteration
-
-
-
-

@@ -15,7 +15,7 @@ if opts:
 
 # Main code
 Cmds={}
-SDir=scriptdir()
+SDir=bindir()+'/Scripts'
 lsdir=len(SDir)
 cprint(tc.colored(SDir+':', 'blue', attrs=['bold']))
 for i in files.walk(SDir+'/**/*'):
