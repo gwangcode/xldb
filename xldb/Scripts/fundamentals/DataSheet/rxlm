@@ -1,0 +1,62 @@
+import stdwb as wb, files, os, xml.etree.ElementTree as et, datatype as dt
+
+
+
+# Help information
+HelpInfo='''
+read XML file to list
+rxml xml-file
+returns list
+'''
+# Variables & Functions
+la=len(args)
+File=''
+
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help'], pkey=[])
+
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    
+if free: 
+  lf=len(free)
+  if lf==2: File=files.fpath(free[1])
+  else: err('Illegal parameters')
+else: err('Illegal parameters')
+
+# Main code
+if os.path.isfile(File):
+  tree = et.parse(File)
+  root = tree.getroot()
+  Tag=root.tag.split('}')[1]
+  r=[]
+  if Tag=='Workbook':
+    for sub in root: 
+      Tag=sub.tag.split('}')[1]
+      if Tag=='Worksheet':
+        for table in sub: 
+          Tag=table.tag.split('}')[1]
+          if Tag=='Table':
+            for row in table:
+              Tag=row.tag.split('}')[1]
+              if Tag=='Row':
+                RowList=[]
+                for cell in row:
+                  Tag=cell.tag.split('}')[1]
+                  if Tag=='Cell':
+                    for data in cell:
+                      Tag=data.tag.split('}')[1]
+                      if Tag=='Data':
+                        Attrib=data.attrib
+                        AttribName=list(Attrib.keys())[0]
+                        AttribValue=Attrib[AttribName]
+                        if AttribValue=='String': RowList.append(data.text)
+                        elif AttribValue=='Number': RowList.append(dt.num(data.text))
+                        else: RowList.append(dt.num(AttribValue+': '+data.text))
+                r.append(RowList)
+  return r
+  
+else: err(File+' not exists')
+  
+    
