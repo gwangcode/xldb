@@ -1,4 +1,4 @@
-import stdwb as wb, cellpath as cp 
+import stdwb as wb, cellpath as cp, datatype as dt 
 
 # Help information
 HelpInfo='''
@@ -9,7 +9,8 @@ join sheet1 sheet2 .to sheet3 -> sheet1, sheet2, and sheet3 are all open sheets
     .inner -> inner join (default)
     .cross -> cross join (full outer join)
     .refresh -> refresh the to-sheet (clear all the previous content)
-e.g. join .cross a/sheet1/ID.A b/sheet2/EmployeeID. .to c/sheet3  -> cross join a/sheet1 and b/sheet2 by ID == EmployeeID. to c/sheet3
+    .exact -> with exact, it needs to match the data exactly (data and type), otherwise it converts the comparing cols to str to compare and all the spaces are illiminated
+e.g. join .cross a/sheet1/ID.A b/sheet2/EmployeeID. .to c/sheet3  -> cross join a/sheet1 and b/sheet2 by ID == EmployeeID. to c/sheet3. The ID's should not be None/''/spaces
 '''
 # Variables & Functions
 la=len(args)
@@ -18,15 +19,17 @@ LSheet=''
 RSheet=''
 ToSheet=''
 Refresh=False
+Exact=False
 
 # Parameter Options
-opts, free=wb.parameter_parse(args, nkey=['help', 'left', 'right', 'inner', 'cross', 'refresh'], pkey=['to'])
+opts, free=wb.parameter_parse(args, nkey=['help', 'left', 'right', 'inner', 'cross', 'refresh', 'exact'], pkey=['to'])
 
 if opts:
   for i in opts:
     if i[0]=='help': err(HelpInfo)
     if i[0]=='to': ToSheet=i[1]
     if i[0]=='refresh': Refresh=True
+    if i[0]=='exact': Exact=True
     elif i[0] in ('left', 'right', 'inner', 'cross'): JoinMode=i[0]
     
 if free: 
@@ -36,8 +39,9 @@ if free:
 else: err('Illegal parameters')
 
 # Main code
-if LSheet not in `.lw /*/*/*;`: err(LSheet+' does not exist')
-if RSheet not in `.lw /*/*/*;`: err(RSheet+' does not exist')
+L=[cp.locate(i) for i in `.lw /*/*/*;`]
+if cp.locate(LSheet) not in L: err(LSheet+' does not exist')
+if cp.locate(RSheet) not in L: err(RSheet+' does not exist')
 if ToSheet not in `.lw /*/*;`: err(ToSheet+' does not exist')
 
 if Refresh: $. remove .from =ToSheet+'/1:';
@@ -65,21 +69,29 @@ RCols=len(RCont[0])
 for iLeft in range(1, len(LId)): 
   FoundMatch=False
   for iRight in range(1, len(RId)):
-    if LId[iLeft]==RId[iRight]: # inner
-      ToCont.append(LCont[iLeft]+RCont[iRight])
-      FoundMatch=True
+    if LId[iLeft] not in (None, '') and RId[iRight] not in (None, ''):
+      Lstr=dt.cstr(LId[iLeft], NoneAs='').strip()
+      Rstr=dt.cstr(RId[iRight], NoneAs='').strip()
+      if (not Exact and Lstr and Rstr and Lstr==Rstr) or (LId[iLeft]==RId[iRight] and Exact): 
+        ToCont.append(LCont[iLeft]+RCont[iRight])
+        FoundMatch=True
     
   if JoinMode in ('left', 'cross') and not FoundMatch: ToCont.append(list(LCont[iLeft])+[None]*RCols) # left
 
 for iRight in range(1, len(RId)): 
   FoundMatch=False
   for iLeft in range(1, len(LId)):
-    if LId[iLeft]==RId[iRight]: 
-      FoundMatch=True
-      break
+    if LId[iLeft] not in (None, '') and RId[iRight] not in (None, ''):
+      Lstr=dt.cstr(LId[iLeft], NoneAs='').strip()
+      Rstr=dt.cstr(RId[iRight], NoneAs='').strip()
+      if (not Exact and Lstr and Rstr and Lstr==Rstr) or (LId[iLeft]==RId[iRight] and Exact): 
+        FoundMatch=True
+        break
   if JoinMode in ('right', 'cross') and not FoundMatch: ToCont.append([None]*LCols+list(RCont[iRight])) # right
 
 $. fetch =ToCont .to =ToSheet
+
+return ToCont
 
 
 
