@@ -1,27 +1,45 @@
-import stdwb as wb, openpyxl as xl, re, files
+import stdwb as wb, fnmatch, files
 
+# Help information
 HelpInfo='''
 save WorkbookTags -> save workbooks
 In the write-only mode, the saved file is the file name added _w e.g. a.xlsx -> a_w.xlsx
+save a, b, c ...
+     .help -> show help
 '''
+# Variables & Functions
 la=len(args)
 
-if la<2: arg=_RTN
-elif la==2: arg=args[1]
-if arg:
-  r=[]
-  for i in wb.wblist():
-    if re.match(wb.name_wildcard(arg), i):
-      try: 
-        if wb.wb(i).is_writeonly():
-          sp=wb.wbp(i).split('.') 
-          sp[-2]=sp[-2]+'_w'
-          wb.wb(i).d.save('.'.join(sp))
-        else:  wb.wbo(i).save(files.fpath(wb.wbp(i)))
-        cprint('Saved '+i)
-        r.append(i)
-      except: err('Failed to save '+i)
-  return r
-else: cprint(HelpInfo)
+# Parameter Options
+opts, free=wb.parameter_parse(args, nkey=['help'], pkey=[])
 
+if opts:
+  for i in opts:
+    if i[0]=='help': err(HelpInfo)
+    
+if free: 
+  lf=len(free)
+  if lf==1: OpenWkbks=_RTN
+  elif lf>=2: OpenWkbks=free[1:]
+  else: err('Illegal parameters')
+else: err('Illegal parameters')
+
+# Main code
+if OpenWkbks:
+  for arg in OpenWkbks:
+    r=[]
+    for i in wb.wblist():
+      if fnmatch.fnmatch(i, arg):
+        try: 
+          if wb.wb(i).is_writeonly():
+            sp=wb.wbp(i).split('.') 
+            sp[-2]=sp[-2]+'_w'
+            wb.wb(i).d.save('.'.join(sp))
+          else:  wb.wbo(i).save(files.fpath(wb.wbp(i)))
+          cprint('Saved '+i)
+          r.append(i)
+        except: err('Failed to save '+i)
+  return r
+
+  
     
