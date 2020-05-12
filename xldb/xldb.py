@@ -1,9 +1,5 @@
 #! /usr/bin/env python3
-##! /Library/Frameworks/Python.framework/Versions/3.8/bin/python3
-
-# initialize ==================================
-
-import sys, os, glob, shlex, re, prompt_toolkit, traceback, fnmatch, io
+import sys, os, glob, shlex, re, prompt_toolkit, traceback, fnmatch, io, gc
 
 _PrintOut=True
 Prompt=''
@@ -311,9 +307,8 @@ def cmd(CMD, NoExit=False, Glbs={}, AutoComplete=False, IsTop=False, External={}
     rvar=None
     return _run_one_cmd(CMD, rvar, NoExit, Glbs=Glbs, AutoComplete=True)
   else:
-    
-    CmdList=split_by_str_out_of_quotation(CMD, '&&')
 
+    CmdList=split_by_str_out_of_quotation(CMD, '&&')
     
     for cmd in CmdList:
       
@@ -491,6 +486,7 @@ def main_loop():
         if BeginCmd: cmd(BeginCmd, Glbs=Glbs, IsTop=True)
         cmd(CMD, Glbs=Glbs, IsTop=True)
         if EndCmd: cmd(EndCmd, Glbs=Glbs, IsTop=True)
+        gc.collect()
       except Exception: 
         try: 
           if EndCmd: cmd(EndCmd, Glbs=Glbs)    
