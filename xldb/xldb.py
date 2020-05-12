@@ -28,10 +28,6 @@ class fpath: # parse a relative path
 
   def full(self): return os.path.abspath(os.path.expanduser(self.path))
 
-  def directory(self):
-    f=self.full()
-    return os.path.dirname(f)
-
   def __split_file(self):
     f=self.full()
     b=os.path.basename(f)
@@ -41,30 +37,6 @@ class fpath: # parse a relative path
     sf=self.__split_file()
     return sf[0]
       
-  def extension(self):
-    sf=self.__split_file()
-    return sf[1]
-
-  def split_dir(self):
-    d=self.directory()
-    return d.split('/')
- 
-  def is_file(self):
-    f=self.full()
-    return os.path.is_file(f)
-
-  def is_dir(self):
-    f=self.full()
-    return os.path.is_dir(f)
-
-  def glob(self):
-    f=self.full()
-    return glob.glob(f, recursive=True)
-
-  def walk(self):
-    f=self.full()
-    return os.walk(f)
-
 # initialize finished ===========================================================
 #class _xldb_sys_void: pass
 
