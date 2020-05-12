@@ -21,39 +21,49 @@ ScriptDir=[] # Script Directories: Command Dir
 BinPath=os.path.dirname(os.path.realpath(__file__))
 PathsSetFilePath=BinPath+'/Paths.set' # Path of Paths.set
       
-'''
-Parse a relative path: ~/Documents/abc.xyz, if abc.xyz is not a directory
-.Full='/Users/Darius/Documents/abc.xyz'
-.Path='/Users/Darius/Documents'
-.File='abc'
-.Extension='.xyz'
-IsDir=False
+class fpath: # parse a relative path
+  path='' # original string of file path
+  
+  def __init__(self, path): self.path=path
 
-Parse a relative path: ~/Documents/abc, if abc is a directory
-.Full='/Users/Darius/Documents/abc'
-.Path='/Users/Darius/Documents'
-.File='abc'
-.Extension=''
-.IsDir=True
-'''
-class File_Path_Parser: # parse a relative path
-  Full='' # full absolute path
-  Path='' # full absolute path up until the directory
-  File='' # file base name
-  Extension='' # file extension name
-  Parts=[] # parts of the Path e.g. Path='abc/def/ghi' => ['abc', 'def', 'ghi']
-  IsDir=False # whether the file is a directory
-  def __init__(self, Path):
-    self.Full=os.path.abspath(os.path.expanduser(Path))
-    self.Path=os.path.dirname(self.Full)
-    Base=os.path.basename(self.Full)
-    self.File, self.Extension=os.path.splitext(Base)
-    self.IsDir=os.path.isdir(self.Full)
-    self.Parts=Path.split('/')
+  def full(self): return os.path.abspath(os.path.expanduser(self.path))
 
-  def exists(self, Full=True): # check if the Full/Path exists
-    if Full: return os.path.exists(self.Full) # Is Full existing
-    else: return os.path.exists(self.Path) # Is the path directory existing
+  def directory(self):
+    f=self.full()
+    return os.path.dirname(f)
+
+  def __split_file(self):
+    f=self.full()
+    b=os.path.basename(f)
+    return os.path.splitext(b)
+  
+  def base(self):
+    sf=self.__split_file()
+    return sf[0]
+      
+  def extension(self):
+    sf=self.__split_file()
+    return sf[1]
+
+  def split_dir(self):
+    d=self.directory()
+    return d.split('/')
+ 
+  def is_file(self):
+    f=self.full()
+    return os.path.is_file(f)
+
+  def is_dir(self):
+    f=self.full()
+    return os.path.is_dir(f)
+
+  def glob(self):
+    f=self.full()
+    return glob.glob(f, recursive=True)
+
+  def walk(self):
+    f=self.full()
+    return os.walk(f)
 
 # initialize finished ===========================================================
 #class _xldb_sys_void: pass
@@ -66,7 +76,7 @@ def err(ErrInfo):
 
 def _read_paths_set_file(Path): # read Paths.set into FuncLib and ScriptDir
   global FuncLib, ScriptDir, ImportLibs, BeginCmd, EndCmd, AutoComplete
-  P=File_Path_Parser(Path).Full
+  P=fpath(Path).full()
   f=open(P)
   L=f.readlines()
   if L:
@@ -80,7 +90,7 @@ def _read_paths_set_file(Path): # read Paths.set into FuncLib and ScriptDir
               i=i.strip()
               j=i.split('/')
               if j[0]=='@': FuncLib.append(BinPath+'/'+'/'.join(j[1:]))
-              else: FuncLib.append(File_Path_Parser(i).Full)
+              else: FuncLib.append(fpath(i).full())
 
         elif Li[0].strip() == 'ScriptDir': 
           for i in Li[1].split(';'):
@@ -88,7 +98,7 @@ def _read_paths_set_file(Path): # read Paths.set into FuncLib and ScriptDir
               i=i.strip()
               j=i.split('/')
               if j[0]=='@': ScriptDir.append(BinPath+'/'+'/'.join(j[1:]))
-              else: ScriptDir.append(File_Path_Parser(i).Full)
+              else: ScriptDir.append(fpath(i).full())
               
         elif Li[0].strip() == 'Imports': ImportLibs=Li[1].strip()
         elif Li[0].strip() == 'BeginCmd': BeginCmd=Li[1].strip()
@@ -99,7 +109,7 @@ def _find_file_in_paths(FileName, AbsPath=False): # IsCmd: Search in ScriptDir, 
   global ScriptDir
   if AbsPath: 
     try: 
-      r=File_Path_Parser(FileName).Full
+      r=fpath(FileName).full()
       if os.path.isfile(r): return r
     except: return None
   else:
@@ -215,6 +225,7 @@ def run_script(FilePathName, Arg, RVar='',Glbs={}): # run cmd script
     exec(''.join(s_external), Glbs)
     exec(''.join(s), Glbs)
     r=eval('__Command_of_'+CmdName+'__(args)', Glbs)
+    exec('del __Command_of_'+CmdName+'__', Glbs)
     
     if RVar: Glbs[RVar]=r
     return r
@@ -406,7 +417,7 @@ def setprint(PrintOut=True):
 def prompt(Str, CWD=True):
   global Prompt
   F=''
-  if CWD: F='{'+File_Path_Parser(os.getcwd()).File+'}'
+  if CWD: F='{'+fpath(os.getcwd()).base()+'}'
   Prompt=F+Str
 
 def bindir():
@@ -462,7 +473,7 @@ class XldbCompleter(prompt_toolkit.completion.Completer):
       BasePath='/'.join(wordlist[:-1])
       if FirstSlash: BasePath='/'+BasePath
       ResidueWord=wordlist[-1]
-      self.Dir=File_Path_Parser(BasePath).Full
+      self.Dir=fpath(BasePath).full()
       if os.path.isdir(self.Dir): os.chdir(self.Dir)
       r=[]
       try:
@@ -521,9 +532,6 @@ def main():
       tunnel_read=sys.stdin.read()
       cmd(tunnel_read)
   else: main_loop()
-    
-  
-  
-         
+
 if __name__ == '__main__': main()
 
