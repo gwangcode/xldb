@@ -4,6 +4,7 @@ import sys, os, glob, shlex, re, prompt_toolkit, traceback, fnmatch, io, gc, sub
 _PrintOut=True
 Prompt=''
 StdOut=sys.stdout
+_PrintCont=''
 
 Quit=False
 
@@ -95,14 +96,15 @@ def _find_file_in_paths(FileName, AbsPath=False): # IsCmd: Search in ScriptDir, 
 # _PrintOut=False: print OffObj to $%0 (OffOutVar=0)
 # If OffObj==None: OffObj=objects
 # USED
-def cprint(Obj, sep=' ', end='\n', flush=False, PrintIfNotNone=False):
-  global _PrintOut
+def cprint(*Obj, sep=' ', end='\n', flush=False, PrintIfNotNone=False):
+  global _PrintOut, _PrintCont
   Print=False
+  _PrintCont+=sep.join(Obj)+end
   if PrintIfNotNone:
     if Obj is not None: Print=True
   else: Print=True
   if Print:
-    if _PrintOut: print(Obj, sep=sep, end=end, flush=flush)
+    if _PrintOut: print(*Obj, sep=sep, end=end, flush=flush)
 
 class line_parser:
   __String=''
@@ -305,7 +307,7 @@ def split_by_str_out_of_quotation(Str, ByStr=' '):
 # if NoExit=True: ignore EXIT
 # The return value is the last command's return value
 def cmd(CMD, NoExit=False, Glbs={}, AutoComplete=False, IsTop=False, External={}):
-  global glbs#, Tunnel, _rtn
+  global glbs, _PrintCont#, Tunnel, _rtn
   RValue=None
   Glbs.update(glbs)
   
@@ -313,12 +315,16 @@ def cmd(CMD, NoExit=False, Glbs={}, AutoComplete=False, IsTop=False, External={}
     rvar=None
     return _run_one_cmd(CMD, rvar, NoExit, Glbs=Glbs, AutoComplete=True)
   else:
-
+    _PrintCont=''
     CmdList=split_by_str_out_of_quotation(CMD, '&&')
     
     for cmd in CmdList:
       
       if cmd:
+        
+        PInput=_PrintCont
+        _PrintOut=''
+
         if IsTop: Glbs['_GLB']={}
         else: 
           Glbs['_GLB']={}
@@ -335,7 +341,7 @@ def cmd(CMD, NoExit=False, Glbs={}, AutoComplete=False, IsTop=False, External={}
 
         if cmd[0]=='/': RValue=_run_one_line_pycmd(cmd[1:], Glbs=Glbs) # /f=3+5: python one line script
         elif cmd[0]=='.': 
-          if cmd[1]=='|': RValue=_run_shell_cmd(cmd[2:], rvar, PipeInput=RValue, Pipe=True, Glbs=Glbs) # pipe
+          if cmd[1]=='|': RValue=_run_shell_cmd(cmd[2:], rvar, PipeInput=PInput, Pipe=True, Glbs=Glbs) # pipe
           else: RValue=_run_shell_cmd(cmd[1:], rvar, Glbs=Glbs)
         else: 
           if cmd[0]=='@': # run a command at a designated path
