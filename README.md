@@ -104,6 +104,11 @@ $. print(x) # directly use outside variables
 $. ~y=10
 print($~y) # use the inside variable
 
+Pipe between commands & shell commands
+.echo abc && .|grep a
+Output: abc
+
+
 Commands:
 NEW  workbooktag .FILE file path: create new workbook or sheet
 NEW /workbooktag .FILE file path
