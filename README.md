@@ -105,9 +105,9 @@ $. ~y=10
 print($~y) # use the inside variable
 
 Pipe between commands & shell commands
-.echo abc && .|grep a
+.print abc && .|grep a
 Output: abc
-
+The shell accepts the strings printed out by cprint
 
 Commands:
 NEW  workbooktag .FILE file path: create new workbook or sheet
