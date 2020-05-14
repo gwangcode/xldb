@@ -600,6 +600,7 @@ def mode_normal2console(attributes):
 # <line=0 col=0 forecolor=2 backcolor=5 mode=UNDERLINE|Hello world!>
 # <font= bleft= |Hello world> => mode=bold+underline forecolor=15 backcolor=30
 def normal2console(bracket):
+  print(bracket)
   r='<|>'
   init_mode=grab_property('mode', bracket)
   if init_mode: 

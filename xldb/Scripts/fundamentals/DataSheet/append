@@ -68,6 +68,7 @@ elif lf>2: Insersion=free[1:]
 # Pos
 if Pos:
   w, s, c=wb.split_wbname(Pos)
+  wb.purge(wb.compose(w, s))
   if not c: 
     if AppendCol: c=wb.num2col(wb.maxcol(wb.compose(w, s)))
     else: c=wb.maxrow(wb.compose(w,s))

@@ -4,9 +4,11 @@ import stdwb as wb, re, dlist, datatype, cellpath as cp
 HelpInfo=''' 
 remove -> remove columns or rows
 remove 1 .from /w/s/A -> remove 1 col at A 
+remove .from /w/s/A -> remove col w/s/A
 remove .from /w/s/A:C  remove cols from A to C -> remove Cols A, B, C from A
 remove =[Col name list] .from /w/s  -> remove cols by name from w/s * such as Student. Gender.
 remove 10 .from /w/s/5  -> remove 10 rows at row 5
+remove .from /w/s/5 -> remove row 5 from w/s
 remove .from /w/s/5:10 -> remove rows from 5 to 10 
 remove =[Row list] .from /w/s  -> remove rows by list from w/s
 remove w/s -> remove sheet
@@ -121,8 +123,7 @@ else:
     if EndRow is not None:
       EndRow=int(EndRow)
       if EndRow<0: EndRow=max(1, wb.maxrow(wb.compose(w, s))+1+EndRow)
-    
-    
+
 
     if BeginCol and EndCol: # remove cols
   

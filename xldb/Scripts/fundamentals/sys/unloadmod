@@ -1,0 +1,16 @@
+
+def unload(Module):
+  if Module in gvars(): del gvars()[Module]
+  else: return Module
+
+HelpInfo='''
+unload ModuleName1 ModuleName2 ...
+'''
+
+if len(args)>1:
+  for i in args[1:]: 
+    r=unload(i)
+    if r: cprint(r+' does not exist')
+else: print(HelpInfo)  
+    
+    

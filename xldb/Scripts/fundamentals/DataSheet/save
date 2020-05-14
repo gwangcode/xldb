@@ -35,7 +35,9 @@ if OpenWkbks:
             sp=wb.wbp(i).split('.') 
             sp[-2]=sp[-2]+'_w'
             wb.wb(i).d.save('.'.join(sp))
-          else:  wb.wbo(i).save(files.fpath(wb.wbp(i)))
+          else:  
+            wb.purge(i)
+            wb.wbo(i).save(files.fpath(wb.wbp(i)))
           cprint('Saved '+i)
           r.append(i)
         except: err('Failed to save '+i)

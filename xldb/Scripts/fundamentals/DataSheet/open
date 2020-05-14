@@ -7,15 +7,17 @@ if more than one workbook, WorkbookTags will be WorkbookTag, WorkbookTag1, ...
 la=len(args)
 DataOnly=True
 ReadOnly=False
+Purge=True
 wbtag=''
 
-opts, free=wb.parameter_parse(args, nkey=['formula', 'readonly', 'help'], pkey=['as'])
+opts, free=wb.parameter_parse(args, nkey=['formula', 'readonly', 'nopurge', 'help'], pkey=['as'])
 
 if opts:
   for i in opts:
     if i[0]=='formula': DataOnly=False
     elif i[0]=='readonly': ReadOnly=True
     elif i[0]=='help': err(HelpInfo)
+    elif i[0]=='nopurge': Purge=False
     else:
       if i[0]=='as': wbtag=i[1]
       else: err('No workbook tag')
@@ -38,9 +40,10 @@ if f1:
           wkbko=xl.load_workbook(j, data_only=DataOnly, read_only=ReadOnly)
           if ntag==0: tag=wbtag
           else: tag=wbtag+str(ntag)
-          cprint('Opened '+tag+' '+j)
           wb.wbset[tag]=wb.wb(wkbko, j) # add wb to wbset
           if ReadOnly: wb.wbset[tag].d=xl.Workbook(write_only=True)
+          elif Purge: wb.purge(tag)
+          cprint('Opened '+tag+' '+j)
           ntag+=1
         except:
           cprint('Failed '+j)

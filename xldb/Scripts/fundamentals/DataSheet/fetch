@@ -301,7 +301,8 @@ if ToFile: # .to
       nRow=str(int(nRow)+1) 
 
   else:
-    if tr in WriteableTypes: wb.write(cellpath, r)
+    if tr in WriteableTypes: 
+      if r: wb.write(cellpath, r)
     else: wb.write(cellpath, str(r))
 
 return Rtn

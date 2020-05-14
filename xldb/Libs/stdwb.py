@@ -468,3 +468,40 @@ def comment(Cell, Comment='', Author=''):
     r=(cello(Cell).comment.author, cello(Cell).comment.text)
     cprint(r[0]+': '+r[1])
     return r
+
+# purge sheet
+def _purge_sheet(Sheet):
+  wkbk, sheet, cell=split_wbname(Sheet)
+  Sheet=compose(wkbk, sheet)
+  MaxCol=maxcol(Sheet)
+  MaxRow=maxrow(Sheet)
+  n=0
+  L=list(range(1, MaxCol+1))
+  L.reverse()
+  for col in L:
+    col=num2col(col)
+    if all([x in (None, '') for x in read(compose(wkbk, sheet, col))]): n+=1
+    else: break
+    
+  if n>0: remove(compose(wkbk, sheet, col), col=n)
+  
+  m=n
+  n=0
+  L=list(range(1, MaxRow+1))
+  L.reverse()
+  for row in L:
+    row=str(row)
+    if all([x in (None, '') for x in read(compose(wkbk, sheet, row))]): n+=1
+    else: break
+    
+  if n>0: remove(compose(wkbk, sheet, row), row=n)
+  
+  return (m, n)
+
+def purge(Sheet):
+  wkbk, sheet, cell=split_wbname(Sheet)
+  
+  if sheet is None: # workbook
+    for sheet in shlist(wkbk): _purge_sheet(compose(wkbk, sheet))
+  else: _purge_sheet(compose(wkbk, sheet)) # sheet
+    

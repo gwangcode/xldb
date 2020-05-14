@@ -127,6 +127,7 @@ def data2styledtext(ScrLines, data, data_size_only=False, MaxRows=None, focus=(0
         for cell in row: pvars.data[cell.row-1][cell.column-1]=cell
       pvars.data=tuple(pvars.data)
     data=pvars.data
+    #data=data[BeginRow:BeginRow+MaxRows]
 
   if type(data) in (tuple, list):
     # header

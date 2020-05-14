@@ -1,5 +1,5 @@
 #! /usr/bin/env python3
-import sys, os, glob, shlex, re, prompt_toolkit, traceback, fnmatch, io, gc
+import sys, os, glob, shlex, re, prompt_toolkit, traceback, fnmatch, io, gc, subprocess
 
 _PrintOut=True
 Prompt=''
@@ -245,9 +245,15 @@ def _remove_double_quotation(Str):
   if Str[0]=='"' and Str[-1]=='"': return Str[1:-1]
   else: return Str
 
-def _run_shell_cmd(CMD, RVar='', Glbs={}):
-  o=os.popen(CMD)
-  r=o.read()
+def _run_shell_cmd(CMD, RVar='', PipeInput='', Pipe=False, Glbs={}):
+  if Pipe:
+    p = subprocess.Popen(shlex.split(CMD, posix=False), stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)    
+    stdout = p.communicate(input=PipeInput.encode())[0]
+    r=stdout.decode()
+  else:
+    o=os.popen(CMD)
+    r=o.read()
+
   if RVar: Glbs[RVar]=r
   else: cprint(r, end='')
   return r
@@ -328,7 +334,9 @@ def cmd(CMD, NoExit=False, Glbs={}, AutoComplete=False, IsTop=False, External={}
         else: rvar=''
 
         if cmd[0]=='/': RValue=_run_one_line_pycmd(cmd[1:], Glbs=Glbs) # /f=3+5: python one line script
-        elif cmd[0]=='.': RValue=_run_shell_cmd(cmd[1:], rvar, Glbs=Glbs)
+        elif cmd[0]=='.': 
+          if cmd[1]=='|': RValue=_run_shell_cmd(cmd[2:], rvar, PipeInput=RValue, Pipe=True, Glbs=Glbs) # pipe
+          else: RValue=_run_shell_cmd(cmd[1:], rvar, Glbs=Glbs)
         else: 
           if cmd[0]=='@': # run a command at a designated path
             AbsPath=True 
