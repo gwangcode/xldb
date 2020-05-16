@@ -4,7 +4,9 @@ import sys, os, glob, shlex, re, prompt_toolkit, traceback, fnmatch, io, gc, sub
 _PrintOut=True
 Prompt=''
 StdOut=sys.stdout
-_PrintCont=''
+
+PipeInput=None
+ToPipe=False
 
 Quit=False
 
@@ -97,14 +99,16 @@ def _find_file_in_paths(FileName, AbsPath=False): # IsCmd: Search in ScriptDir, 
 # If OffObj==None: OffObj=objects
 # USED
 def cprint(*Obj, sep=' ', end='\n', flush=False, PrintIfNotNone=False):
-  global _PrintOut, _PrintCont
+  global _PrintOut, PipeInput, ToPipe
   Print=False
-  _PrintCont+=sep.join(Obj)+end
+  
   if PrintIfNotNone:
     if Obj is not None: Print=True
   else: Print=True
   if Print:
-    if _PrintOut: print(*Obj, sep=sep, end=end, flush=flush)
+    if _PrintOut: 
+      if ToPipe: print(*Obj, sep=sep, end=end, flush=flush, file=PipeInput)
+      else: print(*Obj, sep=sep, end=end, flush=flush)
 
 class line_parser:
   __String=''
@@ -247,11 +251,15 @@ def _remove_double_quotation(Str):
   if Str[0]=='"' and Str[-1]=='"': return Str[1:-1]
   else: return Str
 
-def _run_shell_cmd(CMD, RVar='', PipeInput='', Pipe=False, Glbs={}):
-  if Pipe:
+def _run_shell_cmd(CMD, RVar='', Glbs={}):
+  global PipeInput, ToPipe
+  if PipeInput is not None:
     p = subprocess.Popen(shlex.split(CMD, posix=False), stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)    
-    stdout = p.communicate(input=PipeInput.encode())[0]
+    PInput=PipeInput.getvalue()
+    stdout = p.communicate(input=PInput.encode())[0]
+    PipeInput=None
     r=stdout.decode()
+    
   else:
     o=os.popen(CMD)
     r=o.read()
@@ -307,24 +315,30 @@ def split_by_str_out_of_quotation(Str, ByStr=' '):
 # if NoExit=True: ignore EXIT
 # The return value is the last command's return value
 def cmd(CMD, NoExit=False, Glbs={}, AutoComplete=False, IsTop=False, External={}):
-  global glbs, _PrintCont#, Tunnel, _rtn
+  global glbs, ToPipe, PipeInput
   RValue=None
   Glbs.update(glbs)
-  
+
   if AutoComplete: 
     rvar=None
     return _run_one_cmd(CMD, rvar, NoExit, Glbs=Glbs, AutoComplete=True)
   else:
-    _PrintCont=''
-    CmdList=split_by_str_out_of_quotation(CMD, '&&')
     
+    CmdList=split_by_str_out_of_quotation(CMD, '&&')
+    LCmdList=len(CmdList)
+    Next=0
+
     for cmd in CmdList:
+      Next+=1
       
       if cmd:
         
-        PInput=_PrintCont
-        _PrintOut=''
-
+        if Next<LCmdList:
+          NextCmd=CmdList[Next].strip()
+          if NextCmd[:2]=='.|': 
+            ToPipe=True
+            PipeInput=io.StringIO()
+          
         if IsTop: Glbs['_GLB']={}
         else: 
           Glbs['_GLB']={}
@@ -341,7 +355,9 @@ def cmd(CMD, NoExit=False, Glbs={}, AutoComplete=False, IsTop=False, External={}
 
         if cmd[0]=='/': RValue=_run_one_line_pycmd(cmd[1:], Glbs=Glbs) # /f=3+5: python one line script
         elif cmd[0]=='.': 
-          if cmd[1]=='|': RValue=_run_shell_cmd(cmd[2:], rvar, PipeInput=PInput, Pipe=True, Glbs=Glbs) # pipe
+          if cmd[1]=='|': 
+            RValue=_run_shell_cmd(cmd[2:], rvar, Glbs=Glbs) # pipe
+            PipeInput=None
           else: RValue=_run_shell_cmd(cmd[1:], rvar, Glbs=Glbs)
         else: 
           if cmd[0]=='@': # run a command at a designated path
