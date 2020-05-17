@@ -173,45 +173,46 @@ def _exec_script(FilePathName, Arg, RVar='',Glbs={}): # run cmd script
   
   s=['def __Command_of_'+CmdName+'__(args):\n'] # define __on_run__ function & put in global variables
   raw=f.readlines() # read CMD to raw
-  s_external=[]
-  InExternal=False
-  for i in raw:
-    iTemp=i.strip()
-    iTemp=iTemp.replace(' ', '')
-    
-    if iTemp=='!External:Begin': 
-      InExternal=True
-      continue
-    elif iTemp=='!External:End': 
-      InExternal=False
-      continue
-    p=_parse_script_line(i)
-    if InExternal: s_external.append(p)
-    else: 
-      p='  '+p # add indent of 2 spaces
-      s.append(p)
-
-  if s[-1][-1] != '\n': s[-1]+='\n'  
-   
-  try:
-    exec(''.join(s_external), Glbs)
-    exec(''.join(s), Glbs)
-    r=eval('__Command_of_'+CmdName+'__(args)', Glbs)
-    exec('del __Command_of_'+CmdName+'__', Glbs)
-    
-    if RVar: Glbs[RVar]=r
-    return r
-  
-  except: 
-    etype, value, tb=sys.exc_info()
-    e=traceback.format_exception(etype,value, tb)
-    prt=False
-    for i in e:
-      if '<string>' in i: 
-        prt=True
-        print('Command <'+CmdName+'> error: line '+str(int(i.split(',')[1].split()[1])-1)+' ')
+  if raw:
+    s_external=[]
+    InExternal=False
+    for i in raw:
+      iTemp=i.strip()
+      iTemp=iTemp.replace(' ', '')
+      
+      if iTemp=='!External:Begin': 
+        InExternal=True
         continue
-      if prt: print(i, end='')
+      elif iTemp=='!External:End': 
+        InExternal=False
+        continue
+      p=_parse_script_line(i)
+      if InExternal: s_external.append(p)
+      else: 
+        p='  '+p # add indent of 2 spaces
+        s.append(p)
+
+    if s[-1][-1] != '\n': s[-1]+='\n'  
+    
+    try:
+      exec(''.join(s_external), Glbs)
+      exec(''.join(s), Glbs)
+      r=eval('__Command_of_'+CmdName+'__(args)', Glbs)
+      exec('del __Command_of_'+CmdName+'__', Glbs)
+      
+      if RVar: Glbs[RVar]=r
+      return r
+    
+    except: 
+      etype, value, tb=sys.exc_info()
+      e=traceback.format_exception(etype,value, tb)
+      prt=False
+      for i in e:
+        if '<string>' in i: 
+          prt=True
+          print('Command <'+CmdName+'> error: line '+str(int(i.split(',')[1].split()[1])-1)+' ')
+          continue
+        if prt: print(i, end='')
    
 def _parse_parameter(Parameter, Glbs): # parse cmd line parameters
   
