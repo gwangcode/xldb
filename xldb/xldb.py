@@ -39,11 +39,10 @@ class fpath: # parse a relative path
 # initialize finished ===========================================================
 #class _xldb_sys_void: pass
 
-class _ErrInfo(Exception): pass 
 # print out error information for functions & commands
 def err(ErrInfo):
   cprint(ErrInfo)
-  raise _ErrInfo
+  return ErrInfo
 
 def _read_paths_set_file(Path): # read Paths.set into FuncLib and ScriptDir
   global FuncLib, ScriptDir, ImportLibs, BeginCmd, EndCmd, AutoComplete
@@ -101,9 +100,9 @@ def _find_file_in_paths(FileName, AbsPath=False): # IsCmd: Search in ScriptDir, 
 def cprint(*Obj, sep=' ', end='\n', flush=False, PrintIfNotNone=False):
   global _PrintOut, PipeInput, ToPipe
   Print=False
-  
   if PrintIfNotNone:
-    if Obj is not None: Print=True
+    if len(Obj)>0:
+      if Obj[0] is not None: Print=True
   else: Print=True
   if Print:
     if _PrintOut: 
@@ -159,12 +158,11 @@ def _parse_script_line(Str):
   
   return L.string()
 
-def run_script(FilePathName, Arg, RVar='',Glbs={}): # run cmd script
+def _exec_script(FilePathName, Arg, RVar='',Glbs={}): # run cmd script
   
   try: f=open(FilePathName)
-  except: 
-    cprint('Command '+FilePathName+' not found!')
-    return -1
+  except: cprint('Command '+FilePathName+' not found!')
+    
   CmdName=eval(Arg+'[0]', Glbs)
   CmdName=CmdName.split('/')[-1]
   _CmdName=''
@@ -204,7 +202,6 @@ def run_script(FilePathName, Arg, RVar='',Glbs={}): # run cmd script
     if RVar: Glbs[RVar]=r
     return r
   
-  except _ErrInfo: pass
   except: 
     etype, value, tb=sys.exc_info()
     e=traceback.format_exception(etype,value, tb)
@@ -274,12 +271,11 @@ def _run_one_line_pycmd(OneLine, Glbs):
     try:
       if run_exec: 
         exec(_parse_script_line(OneLine), Glbs)
-      
         run_exec=False
         break
       else:
         r=eval(_parse_script_line(OneLine), Glbs) 
-        cprint(r)
+        cprint(r, PrintIfNotNone=True)
         return r
     except: 
       if run_exec:
@@ -315,8 +311,9 @@ def split_by_str_out_of_quotation(Str, ByStr=' '):
 # if NoExit=True: ignore EXIT
 # The return value is the last command's return value
 def cmd(CMD, NoExit=False, Glbs={}, AutoComplete=False, IsTop=False, External={}):
-  global glbs, ToPipe, PipeInput
+  global glbs, ToPipe, PipeInput, _PrintOut
   RValue=None
+  TempPrintOut=_PrintOut
   Glbs.update(glbs)
 
   if AutoComplete: 
@@ -325,19 +322,27 @@ def cmd(CMD, NoExit=False, Glbs={}, AutoComplete=False, IsTop=False, External={}
   else:
     
     CmdList=split_by_str_out_of_quotation(CMD, '&&')
+    
     LCmdList=len(CmdList)
     Next=0
 
     for cmd in CmdList:
       Next+=1
+      cmd=cmd.strip()
       
       if cmd:
-        
+
         if Next<LCmdList:
           NextCmd=CmdList[Next].strip()
-          if NextCmd[:2]=='.|': 
-            ToPipe=True
-            PipeInput=io.StringIO()
+          if len(NextCmd)>2: 
+            if NextCmd[:2]=='.|': 
+              ToPipe=True
+              PipeInput=io.StringIO()
+
+        if cmd[-1]==';':
+          TempPrintOut=_PrintOut
+          _PrintOut=False
+          cmd=cmd[:-1]
           
         if IsTop: Glbs['_GLB']={}
         else: 
@@ -346,7 +351,7 @@ def cmd(CMD, NoExit=False, Glbs={}, AutoComplete=False, IsTop=False, External={}
         Glbs['_RTN']=RValue
         cmd=split_by_str_out_of_quotation(cmd, '#')[0]
         
-        cmd=cmd.strip()
+        
         if cmd[0]=='~': 
           rvar, cmd=cmd[1:].split('=',1)
           rvar=rvar.strip()
@@ -367,19 +372,16 @@ def cmd(CMD, NoExit=False, Glbs={}, AutoComplete=False, IsTop=False, External={}
         
           RValue=_run_one_cmd(cmd, rvar, NoExit, Glbs=Glbs, AbsPath=AbsPath)
         
+        _PrintOut=TempPrintOut
+
     return RValue
     
 def _run_one_cmd(CMD, RVar='', NoExit=False, Glbs={}, AutoComplete=False, AbsPath=False): # parse command line and pass command to run_script
   global _PrintOut, Quit, StdOut
-  TempPrintOutStatus=_PrintOut
-  NoPrint=False
+  
   RawArg=[]
   CMD=CMD.strip()
-  if CMD[-1]==';': 
-    StdOut=sys.stdout
-    sys.stdout=io.StringIO('')
-    NoPrint=True
-    CMD=CMD[:-1].strip()
+  
   if CMD=='EXIT' and not NoExit: Quit=True
   else:
     RawArg=shlex.split(CMD, posix=False)
@@ -388,17 +390,9 @@ def _run_one_cmd(CMD, RVar='', NoExit=False, Glbs={}, AutoComplete=False, AbsPat
     else: args=[_parse_parameter(i, Glbs) for i in RawArg]
     Glbs['args']=args
     CmdPath=_find_file_in_paths(args[0], AbsPath=AbsPath) 
-    if CmdPath: 
-      if NoPrint: 
-        _PrintOut=False
-        sys.stdout=StdOut
-      #cprint('In run_one_cmd: '+str(Rtn))
-      r=run_script(CmdPath, 'args',RVar, Glbs=Glbs) # return None if successfully run cmd
-      if NoPrint: _PrintOut=TempPrintOutStatus
-      return r
-    else: 
-      cprint('Command '+args[0]+' not found!')
-      return -1 # no command found
+    if CmdPath: return _exec_script(CmdPath, 'args',RVar, Glbs=Glbs) # return None if successfully run cmd
+    else: cprint('Command '+args[0]+' not found!')
+      
 
 def gvars():
   global glbs
