@@ -39,10 +39,11 @@ class fpath: # parse a relative path
 # initialize finished ===========================================================
 #class _xldb_sys_void: pass
 
+class _ErrInfo(Exception): pass 
 # print out error information for functions & commands
 def err(ErrInfo):
   cprint(ErrInfo)
-  return ErrInfo
+  raise _ErrInfo
 
 def _read_paths_set_file(Path): # read Paths.set into FuncLib and ScriptDir
   global FuncLib, ScriptDir, ImportLibs, BeginCmd, EndCmd, AutoComplete
@@ -202,7 +203,8 @@ def _exec_script(FilePathName, Arg, RVar='',Glbs={}): # run cmd script
       
       if RVar: Glbs[RVar]=r
       return r
-    
+
+    except _ErrInfo: pass
     except: 
       etype, value, tb=sys.exc_info()
       e=traceback.format_exception(etype,value, tb)
@@ -278,6 +280,8 @@ def _run_one_line_pycmd(OneLine, Glbs):
         r=eval(_parse_script_line(OneLine), Glbs) 
         cprint(r, PrintIfNotNone=True)
         return r
+        
+    except _ErrInfo: pass
     except: 
       if run_exec:
         etype, value, tb=sys.exc_info()
