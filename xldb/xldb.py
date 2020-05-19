@@ -333,10 +333,11 @@ def cmd(CMD, NoExit=False, Glbs={}, AutoComplete=False, IsTop=False, External={}
 
     for cmd in CmdList:
       Next+=1
+      cmd=split_by_str_out_of_quotation(cmd, '#')[0]
       cmd=cmd.strip()
       
       if cmd:
-
+        
         if Next<LCmdList:
           NextCmd=CmdList[Next].strip()
           if len(NextCmd)>2: 
@@ -354,7 +355,6 @@ def cmd(CMD, NoExit=False, Glbs={}, AutoComplete=False, IsTop=False, External={}
           Glbs['_GLB']={}
           Glbs['_GLB'].update(External)
         Glbs['_RTN']=RValue
-        cmd=split_by_str_out_of_quotation(cmd, '#')[0]
         
         
         if cmd[0]=='~': 
