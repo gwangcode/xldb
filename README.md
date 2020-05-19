@@ -1,5 +1,5 @@
 # xldb
-A platform to operate xlsx data in terminals/command lines
+A platform to operate xlsx data in a terminal
 
 This is a platform based on python to run commands and scripts mainly for manipulating data in xlsx files using openpyxl library.
 
