@@ -2,15 +2,20 @@ import stdwb as wb, openpyxl as xl
 
 HelpInfo='''
 open FilePath .as WorkbookTag .formula .readonly -> List open workbooks
+.as workbook tag -> set the workbook tag (must-have)
+.formula -> include the cell formula
+.readonly -> open as the read only mode (for large data)
+.override -> open new excel to replace the existing one
 if more than one workbook, WorkbookTags will be WorkbookTag, WorkbookTag1, ...
 '''
 la=len(args)
 DataOnly=True
 ReadOnly=False
 Purge=True
+Override=False
 wbtag=''
 
-opts, free=wb.parameter_parse(args, nkey=['formula', 'readonly', 'nopurge', 'help'], pkey=['as'])
+opts, free=wb.parameter_parse(args, nkey=['formula', 'readonly', 'nopurge', 'help', 'override'], pkey=['as'])
 
 if opts:
   for i in opts:
@@ -18,6 +23,7 @@ if opts:
     elif i[0]=='readonly': ReadOnly=True
     elif i[0]=='help': err(HelpInfo)
     elif i[0]=='nopurge': Purge=False
+    elif i[0]=='override': Override=True
     else:
       if i[0]=='as': wbtag=i[1]
       else: err('No workbook tag')
@@ -30,7 +36,7 @@ p=wb.Glob_Parser(f1).Paths
 
 if f1:
   if not wbtag: err('Please designate workbook tag')
-  if wbtag in wb.wblist(): err('Workbook tag already exists!')
+  if wbtag in wb.wblist() and not Override: err('Workbook tag already exists!')
   else:
     if p:
       ntag=0
