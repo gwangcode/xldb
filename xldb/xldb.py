@@ -2,6 +2,7 @@
 import sys, os, glob, shlex, re, prompt_toolkit, traceback, fnmatch, io, gc, subprocess
 
 _PrintOut=True
+GC_Status=True
 Prompt=''
 StdOut=sys.stdout
 
@@ -407,6 +408,11 @@ def setprint(PrintOut=True):
   global _PrintOut
   _PrintOut=PrintOut
 
+def setgc(GC=True):
+  global GC_Status
+  GC_Status=GC
+  return GC
+
 # set up prompt
 # default: >
 # prompt('abc')-> Prompt='abc' -> Prompt becomes abc>
@@ -431,6 +437,7 @@ def initsys(): # initialize the system
   builtins.err=glbs['err']=globals()['err']
   builtins.prompt=glbs['prompt']=globals()['prompt']
   builtins.setprint=glbs['setprint']=globals()['setprint']
+  builtins.setgc=glbs['setgc']=globals()['setgc']
   #builtins.GLB=globals()['GLB']
   builtins.bindir=globals()['bindir']
   exec('import '+ImportLibs, glbs)
@@ -496,7 +503,7 @@ class XldbCompleter(prompt_toolkit.completion.Completer):
       for i in tuple(r): yield prompt_toolkit.completion.Completion(i, start_position=-n)
 
 def main_loop():
-  global Quit, Prompt, BeginCmd, EndCmd, glbs
+  global Quit, Prompt, BeginCmd, EndCmd, glbs, GC_Status
   Glbs={**glbs}
   historyText=prompt_toolkit.history.InMemoryHistory()
   while not Quit:
@@ -515,7 +522,7 @@ def main_loop():
         if BeginCmd: cmd(BeginCmd, Glbs=Glbs, IsTop=True)
         cmd(CMD, Glbs=Glbs, IsTop=True)
         if EndCmd: cmd(EndCmd, Glbs=Glbs, IsTop=True)
-        gc.collect()
+        if GC_Status: gc.collect()
       except Exception: 
         try: 
           if EndCmd: cmd(EndCmd, Glbs=Glbs)    

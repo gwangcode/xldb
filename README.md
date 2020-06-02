@@ -84,6 +84,7 @@ cprint(): print when set is on
 prompt(): set up prompt text
 initsys(): reload initsys() → reinitialize system
 setprint(): set print on/off
+setgc(GC): GC=True: garbage collection everytime finishing up a command; GC=False: Do not run gc.collect after a command
 #rtn(): return value of each command, rtn() → get the return value of the last command; 
 #rtn(True)/rtn(CheckTunnel=True) → get the return value of the last command when it’s on the tunnel command series, only when && exists,  like: cmd 1 && cmd 2 && cmd 3 …, otherwise #rtn() returns None
 builtins.py: import builtins to use all the above built-in functions in lib
@@ -194,5 +195,6 @@ Syntax:
        …
        !External:End
        Script between the External stuff is executed in the module level and the others are executed in the functional level __Command_of_..._(Args)       
+
 
 
