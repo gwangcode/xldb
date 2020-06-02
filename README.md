@@ -85,6 +85,7 @@ prompt(): set up prompt text
 initsys(): reload initsys() → reinitialize system
 setprint(): set print on/off
 setgc(GC): GC=True: garbage collection everytime finishing up a command; GC=False: Do not run gc.collect after a command
+get_init_imports(): get the initial imported modules
 #rtn(): return value of each command, rtn() → get the return value of the last command; 
 #rtn(True)/rtn(CheckTunnel=True) → get the return value of the last command when it’s on the tunnel command series, only when && exists,  like: cmd 1 && cmd 2 && cmd 3 …, otherwise #rtn() returns None
 builtins.py: import builtins to use all the above built-in functions in lib
